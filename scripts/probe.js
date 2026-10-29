@@ -43,8 +43,11 @@ async function clickByText(page, label) {
     }
     const any = [...document.querySelectorAll('body *')].filter((e) => {
       const r = e.getBoundingClientRect();
-      return r.width > 20 && r.width < 300 && r.height > 10 && r.height < 80 &&
-        (e.innerText || '').replace(/\s+/g, ' ').trim() === label && e.children.length < 3;
+      if (r.width < 20 || r.width > 300 || r.height < 10 || r.height > 80) return false;
+      if (e.children.length >= 3) return false;
+      if (e.closest('.el-table, table, .el-form')) return false;   // 别把表格单元格/输入项当筛选
+      if (getComputedStyle(e).cursor !== 'pointer') return false;   // 可点的才算
+      return (e.innerText || '').replace(/\s+/g, ' ').trim() === label;
     })[0];
     if (any) { any.click(); return 'text'; }
     return null;

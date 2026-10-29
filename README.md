@@ -1,5 +1,7 @@
 # dextestweb
 
+[GitHub](https://github.com/yyxc-cc/dextestweb) · [在线说明页](https://yyxc-cc.github.io/dextestweb/) · [下载 ZIP](https://github.com/yyxc-cc/dextestweb/releases/tag/v1.0.0)
+
 **给不拥有这个系统的测试者的 Agent Skill。**
 从"登录、摸模块"到"红框标注截图 + 视频复现 + 单文件报告"，全流程有脚本、有模板、有反误判清单。
 
