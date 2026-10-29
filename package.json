@@ -1,6 +1,6 @@
 {
   "name": "dextestweb",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Agent skill: black-box testing for web systems you don't own — the screenshot stays untouched, annotations live in the margins",
   "license": "MIT",
   "bin": {

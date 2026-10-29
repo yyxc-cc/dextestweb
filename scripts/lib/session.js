@@ -28,10 +28,18 @@ async function openSession(cfg, opts = {}) {
     headless: cfg.headless !== false,
     executablePath: cfg.chromePath || process.env.CHROME_PATH || undefined
   });
+  const vp = cfg.viewport || { width: 1600, height: 1000 };
+  // 视频尺寸必须跟视口同比例，否则 Playwright 会加黑边、切片后画面被压扁。
+  const capW = opts.videoWidth || 1280;
+  const k = Math.min(1, capW / vp.width);
+  const videoSize = {
+    width: Math.round(vp.width * k / 2) * 2,
+    height: Math.round(vp.height * k / 2) * 2
+  };
   const ctx = await browser.newContext({
     viewport: cfg.viewport,
     locale: cfg.locale || 'zh-CN',
-    recordVideo: videoDir ? { dir: videoDir, size: { width: 1280, height: 800 } } : undefined
+    recordVideo: videoDir ? { dir: videoDir, size: videoSize } : undefined
   });
   const page = await ctx.newPage();
   page.setDefaultTimeout(cfg.navTimeout);

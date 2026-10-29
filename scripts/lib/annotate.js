@@ -64,6 +64,11 @@ const MONO = 'Consolas,"Courier New",monospace';
 /* 1. 在目标页面里量矩形（不改 DOM、不注入任何东西）                     */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 在页面里找出每个 box 对应的元素矩形。
+ * 传 scrollFirstOff=true 时，不返回结果，而是把第一个超出视口的元素滚进视野
+ * （元素在视口外时，引线会指向画面外的空白，属于"看起来有标注、其实指错地方"）。
+ */
 function findRects(payload) {
   const vis = (e) => {
     const r = e.getBoundingClientRect();
@@ -103,20 +108,56 @@ function findRects(payload) {
     return pool[spec.nth || 0] || null;
   };
 
-  return payload.boxes.map((spec, i) => {
+  const rects = payload.boxes.map((spec, i) => {
     const el = find(spec);
-    if (!el) return { index: i, ok: false };
+    if (!el) return { index: i, ok: false, why: 'notfound' };
     const r = el.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2) return { index: i, ok: false };
+    if (r.width < 2 || r.height < 2) return { index: i, ok: false, why: 'hidden' };
+
+    // 宽容器（分页条、工具栏）里真正要看的是那行字，不是整条空白。
+    // 元素宽度远大于文字宽度时，改用文字本身的矩形，箭头才能指到字上。
+    let rr = r;
+    let isText = false;
+    try {
+      const rg = document.createRange();
+      rg.selectNodeContents(el);
+      const tr = rg.getBoundingClientRect();
+      if (tr.width > 2 && tr.height > 2 && tr.width * 3 < r.width && tr.height <= r.height + 1) {
+        rr = tr;
+        isText = true;
+      }
+    } catch (e) { /* 有的元素取不到文本范围，退回元素矩形 */ }
+
     return {
       index: i,
       ok: true,
-      x: r.left + (payload.fullPage ? window.scrollX : 0),
-      y: r.top + (payload.fullPage ? window.scrollY : 0),
-      w: r.width,
-      h: r.height
+      text: isText,
+      cx: r.left + r.width / 2,
+      x: rr.left + (payload.fullPage ? window.scrollX : 0),
+      y: rr.top + (payload.fullPage ? window.scrollY : 0),
+      w: rr.width,
+      h: rr.height
     };
   });
+
+  if (!payload.scrollFirstOff) return rects;
+
+  // 把第一个"整个都在视口外"的元素滚进来，再回来重量一次
+  const vh = document.documentElement.clientHeight;
+  const vw = document.documentElement.clientWidth;
+  const off = payload.boxes.findIndex((spec, i) => {
+    const r = rects[i];
+    if (!r.ok) return false;
+    return r.y + r.h <= 0 || r.y >= vh || r.x + r.w <= 0 || r.x >= vw;
+  });
+  if (off >= 0) {
+    const el = find(payload.boxes[off]);
+    if (el) {
+      el.scrollIntoView({ block: 'center', inline: 'nearest' });
+      return { scrolled: true, index: off };
+    }
+  }
+  return { scrolled: false };
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,13 +202,14 @@ function layout(rects, iw, ih, G, accent) {
   const items = [];
   rects.forEach((r) => {
     if (!r.ok) return;
-    const cx = r.x + r.w / 2;
+    const cx = r.cx != null ? r.cx : r.x + r.w / 2;   // 按元素整体判断走左还是走右，别被文字宽度带偏
     items.push({
       index: r.index,
       x: r.x,
       y: r.y,
       w: r.w,
       h: r.h,
+      text: !!r.text,
       ey: r.y + r.h / 2,
       by: r.y + r.h / 2,
       side: cx < iw / 2 ? 'left' : 'right',
@@ -199,6 +241,7 @@ function finalize(items, iw, ih, G) {
     prev = it.baseY;
     slot++;
   }
+  items.forEach((it) => { it.tipY = Math.min(Math.max(it.tipY, 2), ih - 2); });
 
   // 3) 引线拆成两段：
   //    外侧段（边距里）实线 —— 编号到画面边缘
@@ -212,14 +255,20 @@ function finalize(items, iw, ih, G) {
       const rail = G - 16;
       // 箭头往元素里探 16px（一般正好落在内边距里，不压文字），
       // 只在边缘停住时读者会分不清指的是这一列还是旁边那一列。
-      const tip = it.x + Math.min(16, it.w * 0.4);
+      // 指向"文字"时反过来：停在文字外侧 2px，一个笔画都不盖。
+      // 注意：path 用的是画布坐标，图本身从 G 处开始，所以元素的 x 要加 G。
+      const tip = it.text
+        ? G + it.x - 2
+        : G + it.x + Math.min(16, it.w * 0.4);
       const end = Math.max(tip - 12, G);
       it.outer = `M ${(G / 2 + 15).toFixed(1)} ${it.by.toFixed(1)} L ${rail} ${it.by.toFixed(1)} L ${rail} ${y.toFixed(1)} L ${G} ${y.toFixed(1)}`;
       it.inner = end > G + 1 ? `M ${G} ${y.toFixed(1)} L ${end.toFixed(1)} ${y.toFixed(1)}` : '';
       it.tri = `${tip.toFixed(1)},${y.toFixed(1)} ${(tip - 11).toFixed(1)},${(y - 6).toFixed(1)} ${(tip - 11).toFixed(1)},${(y + 6).toFixed(1)}`;
     } else {
       const rail = G + iw + 16;
-      const tip = it.x + it.w - Math.min(16, it.w * 0.4);
+      const tip = it.text
+        ? G + it.x + it.w + 2
+        : G + it.x + it.w - Math.min(16, it.w * 0.4);
       const end = Math.min(tip + 12, G + iw);
       it.outer = `M ${(G + iw + G / 2 - 15).toFixed(1)} ${it.by.toFixed(1)} L ${rail} ${it.by.toFixed(1)} L ${rail} ${y.toFixed(1)} L ${(G + iw)} ${y.toFixed(1)}`;
       it.inner = end < G + iw - 1 ? `M ${(G + iw)} ${y.toFixed(1)} L ${end.toFixed(1)} ${y.toFixed(1)}` : '';
@@ -247,24 +296,24 @@ function buildHtml(o) {
     ${sub ? `<div class="s">${esc(sub)}</div>` : ''}
   </div>` : '';
 
-  const badges = items.map((it) => `<div class="badge" style="left:${(it.badgeX - 14).toFixed(1)}px;top:${(it.by - 14).toFixed(1)}px;background:${it.color}">${it.index + 1}</div>`).join('');
+  const badges = items.map((it) => `<div class="badge" style="left:${(it.badgeX - 14).toFixed(1)}px;top:${(it.by - 14).toFixed(1)}px;background:${it.color}">${it.n || (it.index + 1)}</div>`).join('');
 
   const frames = items.filter((it) => it.frame).map((it) =>
-    `<rect x="${(it.x - 3).toFixed(1)}" y="${(it.y - 3).toFixed(1)}" width="${(it.w + 6).toFixed(1)}" height="${(it.h + 6).toFixed(1)}" rx="4" fill="none" stroke="${it.color}" stroke-width="1.6" opacity=".9"/>`).join('');
+    `<rect x="${(G + it.x - 3).toFixed(1)}" y="${(it.y - 3).toFixed(1)}" width="${(it.w + 6).toFixed(1)}" height="${(it.h + 6).toFixed(1)}" rx="4" fill="none" stroke="${it.color}" stroke-width="1.6" opacity=".9"/>`).join('');
 
   const leads = items.filter((it) => it.arrow && it.outer).map((it) =>
     `<path d="${it.outer}" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linejoin="round" stroke-linecap="round" opacity=".92"/>`
     + `<path d="${it.outer}" fill="none" stroke="${it.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`
     + (it.inner
-      ? `<path d="${it.inner}" fill="none" stroke="#ffffff" stroke-width="5" stroke-dasharray="7 5" opacity=".8"/>`
-        + `<path d="${it.inner}" fill="none" stroke="${it.color}" stroke-width="2.4" stroke-dasharray="7 5" stroke-linecap="butt"/>`
+      ? `<path d="${it.inner}" fill="none" stroke="#ffffff" stroke-width="4" stroke-dasharray="6 4" opacity=".55"/>`
+        + `<path d="${it.inner}" fill="none" stroke="${it.color}" stroke-width="1.8" stroke-dasharray="6 4" stroke-linecap="butt" opacity=".85"/>`
       : '')
     + `<polygon points="${it.tri}" fill="${it.color}"/>`).join('');
 
   const svg = `<svg class="leads" width="${stageW}" height="${ih}" viewBox="0 0 ${stageW} ${ih}">${frames}${leads}</svg>`;
 
   const legend = items.length ? `<ul class="legend">${items.map((it) =>
-    `<li><span class="n" style="background:${it.color}">${it.index + 1}</span><span>${esc(it.label)}</span></li>`).join('')}</ul>` : '';
+    `<li><span class="n" style="background:${it.color}">${it.n || (it.index + 1)}</span><span>${esc(it.label)}</span></li>`).join('')}</ul>` : '';
 
   const foot = (legend || panel || note || url) ? `
   <div class="foot">
@@ -361,23 +410,51 @@ async function capture(page, cfg = {}) {
   const fullPage = !!cfg.fullPage;
   await clearOverlay(page);
 
-  const raw = await page.evaluate(findRects, { boxes, fullPage });
-  const missed = raw.filter((r) => !r.ok).map((r) => ({ index: r.index, spec: boxes[r.index] }));
+  const geo = await page.evaluate(() => ({
+    w: Math.max(document.documentElement.clientWidth, window.innerWidth),
+    h: Math.max(document.documentElement.clientHeight, window.innerHeight)
+  }));
+  const vpW = geo.w || 0;
+  const vpH = geo.h || 0;
+
+  let raw = await page.evaluate(findRects, { boxes, fullPage });
+
+  // 目标元素整个在视口外时，引线会指向画面外的空白 —— 先滚进来再量。
+  if (!fullPage) {
+    for (let round = 0; round < 2; round++) {
+      const off = raw.some((r) => r.ok && (
+        r.y + r.h <= 0 || r.y >= vpH || r.x + r.w <= 0 || r.x >= vpW
+      ));
+      if (!off) break;
+      const res = await page.evaluate(findRects, { boxes, fullPage, scrollFirstOff: true });
+      if (!res || !res.scrolled) break;
+      await page.waitForTimeout(220);
+      raw = await page.evaluate(findRects, { boxes, fullPage });
+    }
+  }
+
+  // 滚完还是在画面外：不许画一条指向空白的引线，直接当"没找到"处理并报案。
+  const outside = (r) => !fullPage && r.ok && (
+    r.y + r.h <= 0 || r.y >= vpH || r.x + r.w <= 0 || r.x >= vpW
+  );
+  const missed = raw.filter((r) => !r.ok || outside(r)).map((r) => ({
+    index: r.index,
+    spec: boxes[r.index],
+    why: outside(r) ? 'offscreen' : (r.why || 'notfound')
+  }));
+  const usable = raw.filter((r) => r.ok && !outside(r));
 
   const png = await page.screenshot({ type: 'png', fullPage, animations: 'disabled' });
   const { w, h } = pngSize(png);
 
-  const vw = await page.evaluate(() => Math.max(
-    document.documentElement.clientWidth, window.innerWidth
-  )).catch(() => 0);
-  const k = vw ? +(w / vw).toFixed(3) : 1;
+  const k = vpW ? +(w / vpW).toFixed(3) : 1;
 
   return {
     png,
-    iw: vw || w,
+    iw: vpW || w,
     ih: Math.round(h / (k || 1)),
     k: k || 1,
-    rects: raw.filter((r) => r.ok),
+    rects: usable,
     missed
   };
 }
@@ -392,7 +469,7 @@ async function shot(page, file, cfg = {}) {
   const accent = cfg.accent || '#e74c3c';
 
   const items = layout(caps.rects, caps.iw, caps.ih, G, accent)
-    .items.map((it, i) => {
+    .items.map((it) => {
       const spec = (cfg.boxes || [])[it.index] || {};
       if (spec.side === 'left' || spec.side === 'right') it.side = spec.side;
       it.color = spec.color || accent;
@@ -400,7 +477,9 @@ async function shot(page, file, cfg = {}) {
       it.frame = !!spec.frame;
       it.arrow = spec.arrow !== false;
       return it;
-    });
+    })
+    .sort((a, b) => a.index - b.index)
+    .map((it, i) => { it.n = i + 1; return it; });   // 有标注被跳过时重新编号，不出现 1、3、4 这种断号
 
   stagger(items.filter((x) => x.side === 'left'), caps.ih);
   stagger(items.filter((x) => x.side === 'right'), caps.ih);
@@ -421,6 +500,8 @@ async function shot(page, file, cfg = {}) {
     dataUri: 'data:image/png;base64,' + caps.png.toString('base64')
   });
 
+  if (cfg.debugHtml) fs.writeFileSync(file.replace(/\.png$/i, '.html'), html);
+
   await cp.setContent(html, { waitUntil: 'load' });
   await cp.evaluate(() => (document.fonts && document.fonts.ready) || true).catch(() => {});
   await cp.waitForTimeout(60);
@@ -439,7 +520,13 @@ async function shot(page, file, cfg = {}) {
   fs.writeFileSync(file, out);
 
   if (caps.missed.length) {
-    console.warn('[annotate] ' + caps.missed.length + ' 个标注没找到元素：', JSON.stringify(caps.missed.map((m) => m.spec)));
+    console.warn('[annotate] ' + caps.missed.length + ' 个标注没能画出来：');
+    caps.missed.forEach((m) => {
+      const why = m.why === 'offscreen' ? '元素在截图范围外（试过滚动仍不可见），换成整页截图或调高 viewport'
+        : m.why === 'hidden' ? '元素尺寸为 0（被折叠/隐藏）'
+          : '页面上找不到匹配元素';
+      console.warn('  - #' + (m.index + 1) + ' ' + JSON.stringify(m.spec) + ' → ' + why);
+    });
   }
   console.log('[shot]', file, (out.length / 1024).toFixed(0) + 'KB',
     `原图 ${caps.iw}×${caps.ih} 未改动，标注在四周 ${G}px 留白里`);
