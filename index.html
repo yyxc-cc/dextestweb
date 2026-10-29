@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dextestweb · 测别人的系统，也能拿出证据</title>
+<meta name="description" content="Agent Skill：黑盒测试你不拥有的 Web 系统，从摸模块到红框标注截图、视频复现、单文件报告。">
+<style>
+  :root{--bg:#0b1018;--card:#131b27;--line:#25303f;--tx:#e8eef7;--dim:#93a2b8;--red:#e74c3c;--green:#16a085;--blue:#3b82f6}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.75 "Microsoft YaHei","PingFang SC",system-ui,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:64px 24px 96px}
+  .tag{display:inline-block;font-size:12.5px;letter-spacing:.12em;color:#7dd3fc;border:1px solid #1e3a5f;background:#0e1c2e;border-radius:999px;padding:4px 12px}
+  h1{font-size:40px;line-height:1.2;margin:18px 0 10px;letter-spacing:-.5px}
+  h1 span{color:#7dd3fc}
+  .sub{font-size:18px;color:#b9c6d8;margin:0 0 28px}
+  .btns{display:flex;gap:12px;flex-wrap:wrap;margin:26px 0 40px}
+  .btn{display:inline-block;padding:11px 20px;border-radius:9px;text-decoration:none;font-weight:600;font-size:14.5px;
+    background:var(--blue);color:#fff;border:1px solid #2f6fd0}
+  .btn.ghost{background:transparent;color:#cfe0f7;border-color:#33455c}
+  .shot{border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:0 0 10px;background:#000}
+  .shot img{width:100%;display:block}
+  .cap{color:var(--dim);font-size:13px;margin:0 0 44px}
+  h2{font-size:22px;margin:44px 0 12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .card b{display:block;margin-bottom:6px;color:#dbe7f6}
+  .card p{margin:0;color:#a9b8cc;font-size:14px}
+  pre{background:#0d1521;border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow:auto;
+    font:13.5px/1.7 Consolas,monospace;color:#c7d6e8}
+  code{font-family:Consolas,monospace}
+  .table{width:100%;border-collapse:collapse;font-size:14.5px;margin:14px 0}
+  .table td,.table th{border-bottom:1px solid var(--line);padding:9px 6px;text-align:left;vertical-align:top}
+  .table th{color:var(--dim);font-weight:600;font-size:13px}
+  .ok{color:#7ee0b8}
+  .bad{color:#ff8b7e}
+  footer{margin-top:56px;color:#6b7c93;font-size:13px;border-top:1px solid var(--line);padding-top:20px}
+  a{color:#8fd3ff}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="tag">AGENT SKILL · 1.0.0</span>
+  <h1>测别人的系统，<br>也要拿得出<span>证据</span>。</h1>
+  <p class="sub">
+    dextestweb 是一套给 AI Agent 的技能：从登录摸模块，到红框标注截图、视频复现，
+    再到一份客户双击就能看的单文件报告。<br>
+    专门解决「你不拥有这个系统、没有源码、没有设计文档」时的测试问题。
+  </p>
+
+  <div class="btns">
+    <a class="btn" href="https://github.com/yyxc-cc/dextestweb">GitHub 仓库</a>
+    <a class="btn ghost" href="https://github.com/yyxc-cc/dextestweb/blob/main/SKILL.md">阅读 SKILL.md</a>
+    <a class="btn ghost" href="https://github.com/yyxc-cc/dextestweb/archive/refs/heads/main.zip">下载 ZIP</a>
+  </div>
+
+  <figure class="shot"><img src="docs/demo.png" alt="dextestweb 标注截图示例"></figure>
+  <p class="cap">↑ 自检脚本生成的示例：红框定位问题、编号按顺序、底部说明、地址栏卡片。真实项目里这三样决定了对方能不能复现。</p>
+
+  <h2>它想解决的不是漏测，是误判</h2>
+  <div class="grid">
+    <div class="card"><b>慢 ≠ 没做</b><p>点完菜单空白 4~18 秒。等目标元素出现再判断，把耗时单独记成性能问题。</p></div>
+    <div class="card"><b>「共 0 条」≠ 没数据</b><p>行数 / 分页 / 接口 total 三方对照。有 18 行却写 0 条，是分页没接。</p></div>
+    <div class="card"><b>默认筛选 ≠ 全部</b><p>默认「未接收」是空的，切到「检验中」有 5 条。逐个筛选跑一遍再定性。</p></div>
+    <div class="card"><b>一张图 ≠ 证据</b><p>页面 + 接口/地址栏/库，两条证据才能写「确定」，一条只能写「疑似」。</p></div>
+  </div>
+
+  <h2>安装</h2>
+  <pre><code># OpenCode 全局技能目录
+git clone https://github.com/yyxc-cc/dextestweb ~/.config/opencode/skills/dextestweb
+
+# 依赖（只在跑脚本时需要）
+npm i playwright &amp;&amp; npx playwright install chromium   # 截图/录屏
+# ffmpeg 用于切片和 GIF</code></pre>
+
+  <h2>从 0 到交付</h2>
+  <table class="table">
+    <tr><th>步骤</th><th>做什么</th><th>脚本</th></tr>
+    <tr><td>0</td><td>确认边界：只读优先、写数据先要授权、客户不用的模块不测</td><td>—</td></tr>
+    <tr><td>1</td><td>摸骨架：菜单→URL→行数→分页→按钮，产出 census.json</td><td><code>census.js</code></td></tr>
+    <tr><td>2</td><td>逐页验证：等目标出现，逐个筛选，行数/分页/接口对照</td><td><code>probe.js</code></td></tr>
+    <tr><td>3</td><td>缺陷取证：步骤/期望/实际/数值变化序列</td><td>—</td></tr>
+    <tr><td>4</td><td>标注截图：红框+编号+结论条+地址栏（注入 DOM 后截图）</td><td><code>lib/annotate.js</code></td></tr>
+    <tr><td>5</td><td>视频/GIF：切片、两遍调色板、超 3MB 就降规格</td><td><code>clip.js</code></td></tr>
+    <tr><td>6</td><td>打包：资源内嵌单文件 HTML + PDF</td><td><code>pack.js</code></td></tr>
+    <tr><td>7</td><td>自检：图片全加载、视频时长、结论↔证据、测试数据清理清单</td><td>—</td></tr>
+  </table>
+
+  <h2>先跑自检，确认链路可用</h2>
+  <pre><code>node scripts/selftest.js
+# ✓ 标注截图  ✓ 单文件 HTML  ✓ 资源已内嵌  ✓ PDF</code></pre>
+  <p class="cap" style="margin-bottom:0">不需要被测系统：脚本会造一个假页面，验证「标注 → 截图 → 内嵌 → PDF」整条链路。</p>
+
+  <h2>包里有什么</h2>
+  <table class="table">
+    <tr><td><code>SKILL.md</code></td><td>主流程、三条规矩、交付自检、常见误判对照表</td></tr>
+    <tr><td><code>references/</code></td><td>01 摸骨架 · 02 取证与验证 · 03 打包交付（含 Windows 中文路径坑）</td></tr>
+    <tr><td><code>scripts/</code></td><td>census / probe / annotate / session / clip / pack / selftest</td></tr>
+    <tr><td><code>templates/</code></td><td>config · issue.md · report.html</td></tr>
+  </table>
+
+  <footer>
+    MIT License · <a href="https://github.com/yyxc-cc/dextestweb">github.com/yyxc-cc/dextestweb</a><br>
+    给那些被叫去「测一下」、但手上什么都没有的人。
+  </footer>
+</div>
+</body>
+</html>
