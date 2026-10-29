@@ -1,7 +1,7 @@
 {
   "name": "dextestweb",
-  "version": "1.0.0",
-  "description": "Agent skill: black-box testing and evidence packaging for web systems you don't own",
+  "version": "1.1.0",
+  "description": "Agent skill: black-box testing for web systems you don't own — the screenshot stays untouched, annotations live in the margins",
   "license": "MIT",
   "bin": {
     "dextest-census": "scripts/census.js",

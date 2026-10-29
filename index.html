@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>dextestweb · 测别人的系统，也能拿出证据</title>
-<meta name="description" content="Agent Skill：黑盒测试你不拥有的 Web 系统，从摸模块到红框标注截图、视频复现、单文件报告。">
+<meta name="description" content="Agent Skill：黑盒测试你不拥有的 Web 系统，从摸模块到标注截图（原图不遮挡）、视频复现、单文件报告。">
 <style>
   :root{--bg:#0b1018;--card:#131b27;--line:#25303f;--tx:#e8eef7;--dim:#93a2b8;--red:#e74c3c;--green:#16a085;--blue:#3b82f6}
   *{box-sizing:border-box}
@@ -44,7 +44,7 @@
   <span class="tag">AGENT SKILL · 1.0.0</span>
   <h1>测别人的系统，<br>也要拿得出<span>证据</span>。</h1>
   <p class="sub">
-    dextestweb 是一套给 AI Agent 的技能：从登录摸模块，到红框标注截图、视频复现，
+    dextestweb 是一套给 AI Agent 的技能：从登录摸模块，到标注截图（原图一个像素都不动）、视频复现，
     再到一份客户双击就能看的单文件报告。<br>
     专门解决「你不拥有这个系统、没有源码、没有设计文档」时的测试问题。
   </p>
@@ -56,7 +56,7 @@
   </div>
 
   <figure class="shot"><img src="docs/demo.png" alt="dextestweb 标注截图示例"></figure>
-  <p class="cap">↑ 自检脚本生成的示例：红框定位问题、编号按顺序、底部说明、地址栏卡片。真实项目里这三样决定了对方能不能复现。</p>
+  <p class="cap">↑ 自检脚本生成的示例：原图没被覆盖，编号在左右空白里，说明在下边空白里，细引线指到元素。</p>
 
   <h2>它想解决的不是漏测，是误判</h2>
   <div class="grid">
@@ -81,7 +81,7 @@ npm i playwright &amp;&amp; npx playwright install chromium   # 截图/录屏
     <tr><td>1</td><td>摸骨架：菜单→URL→行数→分页→按钮，产出 census.json</td><td><code>census.js</code></td></tr>
     <tr><td>2</td><td>逐页验证：等目标出现，逐个筛选，行数/分页/接口对照</td><td><code>probe.js</code></td></tr>
     <tr><td>3</td><td>缺陷取证：步骤/期望/实际/数值变化序列</td><td>—</td></tr>
-    <tr><td>4</td><td>标注截图：红框+编号+结论条+地址栏（注入 DOM 后截图）</td><td><code>lib/annotate.js</code></td></tr>
+    <tr><td>4</td><td>标注截图：干净截图 + 四周留白放编号/引线/图例（原图零覆盖）</td><td><code>lib/annotate.js</code></td></tr>
     <tr><td>5</td><td>视频/GIF：切片、两遍调色板、超 3MB 就降规格</td><td><code>clip.js</code></td></tr>
     <tr><td>6</td><td>打包：资源内嵌单文件 HTML + PDF</td><td><code>pack.js</code></td></tr>
     <tr><td>7</td><td>自检：图片全加载、视频时长、结论↔证据、测试数据清理清单</td><td>—</td></tr>
