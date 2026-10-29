@@ -1,0 +1,25 @@
+{
+  "name": "dextestweb",
+  "version": "1.0.0",
+  "description": "Agent skill: black-box testing and evidence packaging for web systems you don't own",
+  "license": "MIT",
+  "bin": {
+    "dextest-census": "scripts/census.js",
+    "dextest-probe": "scripts/probe.js",
+    "dextest-clip": "scripts/clip.js",
+    "dextest-pack": "scripts/pack.js",
+    "dextest-selftest": "scripts/selftest.js"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.40.0"
+  },
+  "files": [
+    "SKILL.md",
+    "README.md",
+    "LICENSE",
+    "references",
+    "scripts",
+    "templates"
+  ],
+  "keywords": ["agent-skill", "testing", "playwright", "black-box", "evidence", "report"]
+}

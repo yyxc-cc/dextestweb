@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>{{系统名}} 功能测试 · 问题清单</title>
+<!--
+  用法：
+  1. 复制本文件为 交付包/00-问题清单.html
+  2. 每个缺陷复制一个 <section class="card">，编号、图片路径、视频路径换成自己的
+  3. 图片放 01-P0-xxx/ 子目录，路径用相对路径（打包时会被 pack.js 内嵌）
+  4. node scripts/pack.js --html 00-问题清单.html --name "{{系统名}}-问题清单"
+     会产出「-单文件.html」（资源内嵌）和 PDF
+-->
+<style>
+  :root{
+    --bg:#0f1420; --card:#171e2c; --line:#2a3446; --tx:#e8edf6; --dim:#9aa7bd;
+    --red:#e74c3c; --orange:#e67e22; --yellow:#f1c40f; --green:#16a085;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:15px/1.7 "Microsoft YaHei","PingFang SC",system-ui,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 80px}
+  h1{font-size:28px;margin:0 0 6px}
+  .meta{color:var(--dim);font-size:13.5px;margin-bottom:24px}
+  .meta b{color:#cdd8ea;font-weight:600}
+  .selfnote{background:#132032;border:1px solid #2a3d59;border-left:4px solid #3b82f6;
+    border-radius:0 10px 10px 0;padding:11px 18px;font-size:13.5px;color:#b8cee8;margin:0 0 22px}
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 30px}
+  .toc a{display:inline-block;padding:6px 13px;border:1px solid var(--line);border-radius:999px;
+    color:#c8d4e6;text-decoration:none;font-size:13.5px;background:#151c29}
+  .toc a:hover{border-color:#3b82f6;color:#fff}
+  section{margin:0 0 44px;padding-top:6px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px 26px;margin-bottom:14px}
+  .h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .h h2{font-size:20px;margin:0}
+  .lvl{font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:6px;color:#fff;letter-spacing:.5px}
+  .p0{background:var(--red)} .p1{background:var(--orange)} .p2{background:#b4831c} .p3{background:#4b5563}
+  .lead{color:#c3cee0;margin:10px 0 16px}
+  .facts{background:#111826;border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:14px 0}
+  .facts table{width:100%;border-collapse:collapse;font-size:14px}
+  .facts td{padding:6px 4px;border-bottom:1px dashed #24304a;vertical-align:top}
+  .facts td:first-child{color:var(--dim);width:140px;white-space:nowrap}
+  .facts tr:last-child td{border-bottom:none}
+  code{background:#0b111c;border:1px solid #24304a;border-radius:5px;padding:1.5px 6px;
+    font:13.5px/1.5 Consolas,monospace;color:#8fd3ff}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:14px;margin:16px 0}
+  .shot{margin:0;background:#0b111c;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .shot a{display:block;line-height:0}
+  .shot img{width:100%;display:block;cursor:zoom-in}
+  .shot figcaption{padding:9px 13px;font-size:13px;color:var(--dim);line-height:1.5}
+  .shot figcaption b{color:#dbe5f4;font-weight:600}
+  video{width:100%;border-radius:10px;background:#000;display:block}
+  .gifwrap{background:#0b111c;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .gifwrap img{width:100%;border-radius:6px;display:block}
+  .gifwrap p{margin:8px 2px 0;font-size:13px;color:var(--dim)}
+  .cols{display:grid;gap:14px}
+  .warn{border-left:4px solid var(--yellow);background:#1d1a10;border-radius:0 10px 10px 0;
+    padding:12px 18px;font-size:14px;color:#f0e4bd;margin:16px 0}
+  .warn.bad{border-left-color:var(--red);background:#22120f}
+  .warn.ok{border-left-color:var(--green);background:#0f1f1b}
+  .small{color:var(--dim);font-size:13px}
+  h3{font-size:16px;margin:22px 0 8px;color:#dbe5f4}
+  table.mod{width:100%;border-collapse:collapse;font-size:14px}
+  table.mod th,table.mod td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left}
+  table.mod th{color:var(--dim);font-weight:600;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>{{系统名}} 功能测试 · 问题清单</h1>
+  <div class="meta">
+    被测系统 <b>{{地址}}</b>　账号 <b>{{账号}}</b>　测试日期 <b>{{日期}}</b><br>
+    测试方式：浏览器实际操作 + 接口返回核对 + 录屏。每条结论都有截图或录像对应。
+  </div>
+
+  <div class="selfnote">
+    📦 <b>单文件版</b>：截图和视频已内嵌，可直接双击打开、也可单独转发；点任意截图可放大。
+  </div>
+
+  <div class="toc">
+    <a href="#p0">01 · P0 {{问题简称}}</a>
+    <a href="#p2">02 · P2 {{问题简称}}</a>
+    <a href="#mods">模块实况</a>
+    <a href="#data">测试数据</a>
+    <a href="#fix">更正说明</a>
+  </div>
+
+  <!-- ============ 一个完整的问题卡（复制这一段） ============ -->
+  <section id="p0">
+    <div class="card">
+      <div class="h"><span class="lvl p0">P0</span><h2>{{一句话标题：哪里、什么条件、错了什么}}</h2></div>
+
+      <p class="lead">
+        {{两三句话讲清楚：在什么条件下触发，原因是什么（能确定的话），结果是什么。}}
+      </p>
+
+      <div class="facts">
+        <table>
+          <tr><td>页面 / URL</td><td>{{菜单路径}}　<code>{{#/page/...}}</code></td></tr>
+          <tr><td>前置数据</td><td><code>{{单号}}</code>　{{状态}}　{{计划数}}</td></tr>
+          <tr><td>操作</td><td>{{点了什么、填了什么}}</td></tr>
+          <tr><td>系统提示</td><td><code>{{原文提示，一字不改}}</code></td></tr>
+          <tr><td>实际结果</td><td><b style="color:#ff8b7e">{{关键数值 / 0 条}}</b></td></tr>
+        </table>
+      </div>
+
+      <div class="warn bad">
+        后果：{{用现场语言讲影响。例：计划 4 件的订单记着已投 33 件，排产/报工/追溯全错，界面无法修正。}}
+      </div>
+
+      <div class="warn">
+        <b>给开发的话：</b>{{一句话修复方向。例：占用额度和写编码不在同一事务里，失败时需要回滚。}}
+      </div>
+
+      <h3>截图（红框是问题点，①②按顺序看）</h3>
+      <div class="grid">
+        <figure class="shot">
+          <a href="01-P0-xxx/01-xxx.png" target="_blank">
+            <img src="01-P0-xxx/01-xxx.png" alt="{{图1描述}}"></a>
+          <figcaption><b>① {{图1标题}}</b><br>{{看什么}}</figcaption>
+        </figure>
+        <figure class="shot">
+          <a href="01-P0-xxx/02-xxx.png" target="_blank">
+            <img src="01-P0-xxx/02-xxx.png" alt="{{图2描述}}"></a>
+          <figcaption><b>② {{图2标题}}</b><br>{{看什么}}</figcaption>
+        </figure>
+      </div>
+
+      <h3>视频复现</h3>
+      <div class="cols">
+        <div class="gifwrap">
+          <img src="01-P0-xxx/关键片段.gif" alt="关键片段">
+          <p>关键片段（GIF）：{{动作 → 结果}}</p>
+        </div>
+        <div>
+          <video controls preload="metadata" src="01-P0-xxx/复现全过程.mp4"></video>
+          <p class="small" style="margin:8px 2px 0">复现全过程（{{53 秒}}）：{{包含哪几个阶段}}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 一个较轻的问题卡（演示短写法） ============ -->
+  <section id="p2">
+    <div class="card">
+      <div class="h"><span class="lvl p2">P2</span><h2>{{标题}}</h2></div>
+      <p class="lead">{{一两句：现象 + 判断依据。}}</p>
+      <div class="facts">
+        <table>
+          <tr><td>{{对照项}}</td><td>{{页面显示}} vs {{实际}}</td></tr>
+          <tr><td>影响</td><td>{{…}}</td></tr>
+        </table>
+      </div>
+      <div class="grid">
+        <figure class="shot">
+          <a href="02-P2-xxx/01-xxx.png" target="_blank">
+            <img src="02-P2-xxx/01-xxx.png" alt="{{描述}}"></a>
+          <figcaption><b>{{标题}}</b><br>{{看什么}}</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 模块实况：证明"哪些是有的" ============ -->
+  <section id="mods">
+    <div class="card">
+      <div class="h"><span class="lvl" style="background:var(--green)">对照</span><h2>模块实况（不是问题，是现状）</h2></div>
+      <p class="lead">页面和入口基本是齐的。真正要修的是上面几条，而不是"重新做一套"。</p>
+      <table class="mod">
+        <tr><th>模块</th><th>实测内容</th><th>主要功能</th></tr>
+        <tr><td>{{模块1}}</td><td>{{条数 / 标签页}}</td><td>{{按钮}}</td></tr>
+        <tr><td>{{模块2}}</td><td>{{…}}</td><td>{{…}}</td></tr>
+      </table>
+      <div class="grid">
+        <figure class="shot">
+          <a href="06-模块实况/01-xxx.png" target="_blank">
+            <img src="06-模块实况/01-xxx.png" alt="{{模块1}}"></a>
+          <figcaption><b>{{模块1}}</b><br>{{实测内容}}</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 测试数据：必须写清楚 ============ -->
+  <section id="data">
+    <div class="card">
+      <div class="h"><span class="lvl p3">注意</span><h2>测试数据说明（需要管理员处理）</h2></div>
+      <div class="facts">
+        <table>
+          <tr><td>新增数据</td><td>{{单号 / 编码，挂在谁下面，各几条}}</td></tr>
+          <tr><td>正常回写</td><td>{{哪些变化是系统该做的，可以保留}}</td></tr>
+          <tr><td>⚠ 被污染的数据</td><td>{{哪条数据被测试改坏了，原值 → 现值}}</td></tr>
+          <tr><td>建议处理</td><td>{{重置为 X，或删除；给出 id，方便管理员定位}}</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 更正：早期误判必须写出来 ============ -->
+  <section id="fix">
+    <div class="card">
+      <div class="h"><span class="lvl p3">更正</span><h2>结论更正</h2></div>
+      <p class="lead">测试前期得出的结论，用"等页面真正加载完"重测后被推翻的，一并列出，避免误导。</p>
+      <div class="facts">
+        <table>
+          <tr><td>「{{早期说法}}」</td><td><b style="color:#7ee0b8">错</b>。{{实际情况}}</td></tr>
+          <tr><td>「{{早期说法}}」</td><td><b style="color:#ffc46b">部分错</b>。{{实际情况}}</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <p class="small" style="text-align:center;margin-top:40px">
+    {{系统名}} 功能测试 · {{账号}} · {{日期}}
+  </p>
+</div>
+</body>
+</html>

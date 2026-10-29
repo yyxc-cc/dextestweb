@@ -1,0 +1,21 @@
+{
+  "baseUrl": "http://127.0.0.1:8080/",
+  "login": {
+    "url": "http://127.0.0.1:8080/",
+    "userSelector": "input[placeholder=\"用户名\"]",
+    "passSelector": "input[placeholder=\"密码\"]",
+    "username": "demo",
+    "password": "demo123",
+    "submitSelector": "button:has-text(\"登录\")",
+    "success": "() => !location.hash.includes('login')"
+  },
+  "headless": true,
+  "viewport": { "width": 1600, "height": 1000 },
+  "chromePath": "",
+  "appContainer": ".app-main",
+  "menuContainer": ".sidebar-container",
+  "readySelector": ".app-main .el-table__body tbody tr",
+  "navTimeout": 90000,
+  "waitAfterNav": 2500,
+  "locale": "zh-CN"
+}
