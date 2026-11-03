@@ -3,7 +3,7 @@
 [GitHub](https://github.com/yyxc-cc/dextestweb) · [在线说明页](https://yyxc-cc.github.io/dextestweb/) · [下载 ZIP](https://github.com/yyxc-cc/dextestweb/releases/tag/v1.0.0)
 
 **给不拥有这个系统的测试者的 Agent Skill。**
-从"登录、摸模块"到"标注截图 + 视频复现 + 单文件报告"，全流程有脚本、有模板、有反误判清单。
+从"登录、摸模块"到"标注截图 + 缺陷当场的演示视频 + 单文件报告"，全流程有脚本、有模板、有反误判清单；另附工业/MOM 业务课，不懂车间也能判断"数对不对"。
 
 > 适用场景：你被叫去测一个别人的 Web 系统——没有源码、没有设计文档、可能没有数据库权限，
 > 但你要给出"哪里有问题、怎么复现、有什么证据"的结论。
@@ -59,12 +59,18 @@ npx playwright install chromium
 ```bash
 cp templates/config.example.json config.json     # 填账号、登录选择器、菜单容器
 node scripts/census.js --config config.json      # 1) 摸骨架：菜单/URL/行数/分页 → census.json
-node scripts/probe.js  --config config.json --url "<页面URL>" --filters "未接收,检验中"
-                                                 # 2) 单页取证：逐个筛选确认
-node scripts/selftest.js                         # 3) 先跑自检，确认标注/打包链路可用
+node scripts/snap.js --config config.json --url "<页面URL>" --tab "综合查询" --expect-tab "综合查询" --verbose
+                                                 # 2) 单页元素清单：页签/按钮(分级)/字段/列/分页/树
+node scripts/probe.js  --config config.json --url "<页面URL>" --expect-tab "CT" --filters "未接收,检验中"
+                                                 # 3) 单页取证：先过页面身份闸门，再逐个筛选
+node scripts/selftest.js                         # 4) 先跑自检，确认标注/打包链路可用
 ```
 
+登录态默认缓存在 `.auth/<host>.json`，第二次起免登录；换账号或缓存失效加 `--fresh`。
+
 然后按 `SKILL.md` 的第 4~6 步出图、切片、打包。
+
+**发现 bug 就出片**：复制 `templates/demo-script.js`，把中间的操作换成你的，`demo.mark()` 打在动作之前，收尾自动切出 `mp4 + 封面 + gif`；视频上方会自动加一条留白标题条（标题=标记名），画面零遮挡。
 
 ---
 
@@ -76,17 +82,24 @@ dextestweb/
 ├─ references/
 │  ├─ 01-recon.md            ← 没有文档怎么摸清系统（菜单/接口/四个数）
 │  ├─ 02-evidence.md         ← 双证据、三查法、五类高频问题的验证脚本
-│  └─ 03-packaging.md        ← 交付结构、单文件 HTML、Windows 中文路径坑
+│  ├─ 03-packaging.md        ← 交付结构、单文件 HTML、Windows 中文路径坑
+│  ├─ 04-industry.md         ← 工业业务课：系统版图/订单主线/12 对象/10 条不变量/术语表
+│  └─ 05-mom-checks.md       ← MOM 只读快检表：一页一页照着对
 ├─ scripts/
 │  ├─ lib/annotate.js        ← 干净截图 + 四周留白排版（编号/引线/图例/说明/地址栏），原图零覆盖
-│  ├─ lib/session.js         ← 登录、等待、快照、失败请求收集
+│  ├─ lib/demo.js            ← 缺陷视频：打标记 → 自动切片 mp4 + 封面 + GIF
+│  ├─ lib/session.js         ← 登录态缓存、页面身份校验、快照、失败请求收集、videoStart
+│  ├─ lib/snap.js            ← 元素清单核心（页签/按钮分级/字段/列/分页/弹窗/树 + diff）
 │  ├─ census.js              ← 遍历菜单产出 census.json
+│  ├─ snap.js                ← 单页元素清单 CLI（--tab / --diff / --fail-on-change）
 │  ├─ probe.js               ← 单页取证（逐个筛选、行数/分页对照）
 │  ├─ clip.js                ← ffmpeg：切片 / GIF / 抽帧 / 联络表
-│  ├─ pack.js                ← 单文件 HTML（资源内嵌）+ PDF
+│  ├─ pack.js                ← 单文件 HTML（资源内嵌，含视频/poster）+ PDF
+│  ├─ md2html.js             ← 报告 md → html，给 pack.js 吃
 │  └─ selftest.js            ← 不需要被测系统的端到端自检
 └─ templates/
    ├─ config.example.json
+   ├─ demo-script.js         ← 缺陷视频演示脚本模板
    ├─ issue.md               ← 单个缺陷记录模板
    └─ report.html            ← 报告页面模板（深色卡片 + 截图 + 视频）
 ```
@@ -103,6 +116,22 @@ dextestweb/
 ---
 
 ## 更新
+
+**1.3.0** — 缺陷视频"当场出片" + 工业业务层
+
+- 新增 `lib/demo.js`：全程录像 → `demo.mark()` 打点 → `finishDemo()` 自动切片出 `mp4 + 封面 + gif`，多个缺陷一次切完，编号自动递增。
+- 视频默认在画面上方加**留白标题条**（标题=标记名、备注=副标题），画面一个像素不遮挡；颜色语义跟截图一致（红缺陷/橙待确认/绿正常），`caption:false` 可关。
+- 时间轴校准：实测录像时间轴是线性的，偏差只在"开录晚几秒"，用 `结束墙钟 − 视频时长` 反推即可；切点越界会被夹取并告警，不再悄悄产出空文件。
+- `md2html.js` 支持 `![说明](xx.mp4)` → 带控件 `<video>`，同名 `-封面.jpg` 自动挂 poster；`pack.js` 把视频 base64 内嵌进单文件 HTML（断网可播）。
+- 新增 `snap.js` + `lib/snap.js`：一页的页签/按钮（按 mutate/reset/read 分级）/字段/列/分页/弹窗/树全部列清，元素自带 annotate 可用的选择器；`--diff` 做结构回归，`--fail-on-change` 退出码 4。
+- 新增 `references/04-industry.md`：ERP/PLM/MOM/WMS/QMS/SCADA 版图、一张订单的完整旅程、MOM 12 个核心对象、10 条硬不变量、9 类行业特有缺陷、小白提问清单、术语表。
+- 新增 `templates/demo-script.js`：缺陷视频脚本模板，改三处就能跑。
+
+**1.2.0** — 核对规则 + 打包链路
+
+- 页面身份闸门 `expectPage()`：页签文字对不上就抛异常 + 截图，读数直接作废。
+- 新增 `md2html.js`，报告统一走 md → html → pack.js。
+- 标注新增 `frame`/`arrow`/`side` 选项，宽容器自动改指内部文字。
 
 **1.1.1** — 用假 MOM 系统实跑后修的三个真问题
 
@@ -127,10 +156,11 @@ dextestweb/
 
 ```bash
 node scripts/selftest.js
-# ✓ 标注截图 / ✓ 单文件 HTML / ✓ 资源已内嵌 / ✓ PDF
+# ✓ 标注截图 / ✓ 单文件 HTML / ✓ 资源已内嵌 / ✓ PDF / ✓ 缺陷视频 / ✓ 视频已内嵌
 ```
 
-自检产物在系统临时目录 `dextestweb-selftest/`，可以直接打开看效果。
+自检不需要被测系统：脚本会造一个假页面，把「截图 → 边距标注 → 打标记切片 → 内嵌 → PDF」整条链路跑一遍。
+没装 ffmpeg 会自动跳过视频那几项（`--no-video` 可强制跳过）。
 
 ---
 

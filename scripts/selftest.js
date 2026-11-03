@@ -10,6 +10,9 @@
  *   3. pack.js 能把资源内嵌成单文件 HTML
  *   4. 能生成 PDF（需要 playwright）
  *
+ * 另外默认验证「缺陷视频」链路（打标记 → 自动切片 → 封面/GIF → 内嵌）；
+ * 没装 ffmpeg 会自动跳过；想跳过用 --no-video。
+ *
  * 依赖：npm i playwright && npx playwright install chromium
  * 想指定浏览器：CHROME_PATH=/path/to/chrome node scripts/selftest.js
  */
@@ -60,12 +63,24 @@ h2{font-size:18px;margin:4px 0 16px;font-weight:600}
 (async () => {
   const { chromium } = require('playwright');
   const { shot, closeComposer } = require('./lib/annotate');
+  const { createDemo, finishDemo, probeDuration, probeSize } = require('./lib/demo');
+
+  // 没 ffmpeg 就跳过视频链路，不把"环境缺依赖"报成"链路坏了"
+  const hasFfmpeg = (() => {
+    try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true; } catch (e) { return false; }
+  })();
+  const withVideo = hasFfmpeg && !process.argv.includes('--no-video');
 
   const browser = await chromium.launch({
     headless: true,
     executablePath: process.env.CHROME_PATH || undefined
   });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 760 } });
+  const ctx = await browser.newContext({
+    viewport: { width: 1440, height: 760 },
+    ...(withVideo ? { recordVideo: { dir: path.join(DIR, 'rec'), size: { width: 1440, height: 760 } } } : {})
+  });
+  const page = await ctx.newPage();
+  const videoStart = withVideo ? Date.now() : null;
   await page.setContent(PAGE);
 
   const gutter = 88;
@@ -84,11 +99,36 @@ h2{font-size:18px;margin:4px 0 16px;font-weight:600}
     note: '原图一个像素都没被覆盖：编号在左右空白里，说明在下边空白里，靠细引线指到元素。'
   });
   await closeComposer();
+
+  // ---- 缺陷视频链路：打标记 → 自动切片 → 封面/GIF ----
+  let clip = null;
+  if (withVideo) {
+    const demo = createDemo(page, videoStart);
+    demo.mark('分页数字随数据更新', '2 行数据 → 共 2 条');
+    await page.evaluate(() => {
+      document.querySelector('.el-pagination').textContent = '共 2 条　每页 20 条';
+    });
+    await page.waitForTimeout(1500);
+    const res = await finishDemo({ page, ctx, demo, outDir: DIR, pre: 2, post: 2, gif: true });
+    clip = res.clips[0] || null;
+  } else {
+    await page.close();
+    await ctx.close();
+  }
   await browser.close();
 
   const shotBuf = fs.readFileSync(png);
   const out = pngSize(shotBuf);
   const expectW = 1440 + gutter * 2;
+
+  const videoHtml = clip
+    ? `<figure class="shot">
+<video controls muted playsinline preload="metadata" src="${path.basename(clip.file)}" poster="${path.basename(clip.poster)}"></video>
+<figcaption>② 缺陷视频（打标记后自动切的 4 秒片段；pack 后已内嵌，断网可播）</figcaption></figure>
+<figure class="shot">
+<img src="${path.basename(clip.gif)}" alt="GIF 预览">
+<figcaption>③ 同片段 GIF（贴群/邮件预览用）</figcaption></figure>`
+    : '';
 
   const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
 <title>自检报告</title><style>
@@ -105,7 +145,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.7 "Microsoft YaHe
 <p style="color:#9aa7bd">这张图由 annotate.js 生成（截图不动，标注在四周留白里），再由 pack.js 内嵌进本文件。</p>
 <div class="grid"><figure class="shot">
 <a href="01-demo.png"><img src="01-demo.png" alt="自检截图"></a>
-<figcaption>① 自检截图（编号在边距、引线指向元素）</figcaption></figure></div>
+<figcaption>① 自检截图（编号在边距、引线指向元素）</figcaption></figure>${videoHtml}</div>
 </div></div></body></html>`;
   const report = path.join(DIR, 'report.html');
   fs.writeFileSync(report, html);
@@ -126,6 +166,22 @@ body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.7 "Microsoft YaHe
     ['PDF', fs.existsSync(pdf), fs.existsSync(pdf) ? kb(pdf) : '-']
   ];
 
+  if (clip) {
+    const dur = probeDuration(clip.file);
+    const dim = probeSize(clip.file);
+    const htmlText = fs.readFileSync(single, 'utf8');
+    checks.push(
+      ['缺陷视频', fs.existsSync(clip.file), dur ? `${dur.toFixed(1)}s` : '时长读取失败'],
+      ['视频封面', fs.existsSync(clip.poster), clip.poster ? path.basename(clip.poster) : '-'],
+      ['视频 GIF', !!(clip.gif && fs.existsSync(clip.gif)), clip.gif ? kb(clip.gif) : '-'],
+      ['标题条留白', !!dim && dim.height > 760, dim ? `${dim.width}×${dim.height}（画面 1440×760 未被覆盖）` : '尺寸读取失败'],
+      ['视频已内嵌', htmlText.includes('data:video/mp4'), '单文件 HTML 内含 data:video/mp4'],
+      ['封面已内嵌', /poster="data:image\/jpeg/.test(htmlText), '']
+    );
+  } else {
+    checks.push(['缺陷视频', true, hasFfmpeg ? '已用 --no-video 跳过' : '跳过（未装 ffmpeg）']);
+  }
+
   console.log('\n==== 自检结果 ====');
   let ok = true;
   for (const [name, pass, extra] of checks) {
@@ -133,6 +189,6 @@ body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.7 "Microsoft YaHe
     console.log(`${pass ? '✓' : '✗'} ${name.padEnd(10)} ${extra}`);
   }
   console.log('产物目录：', DIR);
-  console.log(ok ? '\n全部通过：截图 → 边距标注 → 内嵌 → PDF 链路可用。' : '\n有失败项，按上面的提示排查。');
+  console.log(ok ? '\n全部通过：截图 → 边距标注 → 缺陷视频 → 内嵌 → PDF 链路可用。' : '\n有失败项，按上面的提示排查。');
   process.exit(ok ? 0 : 1);
 })().catch((e) => { console.error('ERROR:', e.message); process.exit(1); });

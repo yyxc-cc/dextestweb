@@ -3,19 +3,22 @@
  * dextestweb · 单页取证
  *
  *   node probe.js --config config.json --url "<页面URL>" [--filters "未接收,检验中"] [--wait 8000]
- *                 [--shot out.png] [--json out.json]
+ *                 [--expect-tab "CT"] [--expect-hash "/page/xxx"] [--expect-text "物料编号"]
+ *                 [--shot out.png] [--json out.json] [--fresh]
  *
  * 用法要点：
  *   - 先不带 --filters 跑一遍，看默认状态
  *   - 再带筛选逐个点，确认"是默认空"还是"真的空"
  *   - 输出里 rows vs pags 不一致，就是分页 bug 的候选
+ *   - 带页签的页面**务必**加 --expect-tab：点页签不生效时，它会直接拦下来并截图，
+ *     不会把上一个页签的数据当成这个页签的结论
  *
  * 点击筛选用的选择器：.task-state-item / .el-tabs__item / 文本完全匹配的可点击元素，依次尝试。
  */
 
 const fs = require('fs');
 const path = require('path');
-const { loadConfig, openSession, waitForContent, snapshot } = require('./lib/session');
+const { loadConfig, openSession, gotoPage, snapshot, pageIdentity, expectPage } = require('./lib/session');
 
 const argv = process.argv.slice(2);
 const flags = {};
@@ -55,24 +58,57 @@ async function clickByText(page, label) {
 }
 
 (async () => {
-  const { browser, ctx, page, failures } = await openSession(cfg);
+  const { browser, ctx, page, failures } = await openSession(cfg, {
+    fresh: !!flags.fresh,
+    authFile: flags.auth
+  });
 
-  await page.goto(flags.url, { waitUntil: 'commit', timeout: cfg.navTimeout });
-  await waitForContent(page, cfg);
+  const nav = await gotoPage(page, cfg, flags.url);
+  if (!nav.ok) console.log('⚠ 目标内容没出现（等不到 readySelector），下面读数可能不可信');
+  if (nav.reloaded) console.log('  （直接跳转没渲染出来，已重新加载/重进一次——可记成观察项）');
   await page.waitForTimeout(Number(flags.wait || cfg.waitAfterNav));
 
-  const result = { url: flags.url, default: await snapshot(page, cfg), filters: [], httpFailures: [] };
+  // 页面身份闸门：不匹配就别读数了，先解决"我读的是哪一页"
+  const expect = {
+    tab: flags['expect-tab'],
+    notTab: flags['expect-not-tab'],
+    hash: flags['expect-hash'],
+    menu: flags['expect-menu'],
+    text: flags['expect-text']
+  };
+  let identity;
+  try {
+    identity = Object.values(expect).some(Boolean)
+      ? await expectPage(page, cfg, expect, { shot: flags['mismatch-shot'] || 'page-mismatch.png' })
+      : await pageIdentity(page, cfg);
+  } catch (e) {
+    console.error('✗ ' + e.message);
+    console.error('  身份快照：' + JSON.stringify(e.identity));
+    if (e.shot) console.error('  已截图：' + e.shot);
+    console.error('  这一步的读数已作废。先解决"到底停在哪一页"，再跑一次。');
+    await ctx.close();
+    await browser.close();
+    process.exit(2);
+  }
+  console.log('[probe] 页面身份:', JSON.stringify({ hash: identity.hash, tab: identity.activeTab, menu: identity.menu }));
+
+  const result = { url: flags.url, identity, default: await snapshot(page, cfg), filters: [], httpFailures: [] };
 
   for (const f of filters) {
     const how = await clickByText(page, f);
     await page.waitForTimeout(Number(flags.wait || 5000));
     const snap = await snapshot(page, cfg);
-    result.filters.push({ filter: f, clickedBy: how, ...snap });
-    console.log(`[probe] ${f.padEnd(8)} rows=${String(snap.rows).padStart(3)} ${snap.pags.join(' ') || '(无分页)'}`);
+    const idNow = await pageIdentity(page, cfg);
+    // 点了筛选后页签变了，说明点错了元素（比如同名按钮落在别的页签里）
+    if (flags['expect-tab'] && idNow.activeTab.length && !idNow.activeTab.some((t) => t.includes(flags['expect-tab']))) {
+      console.log(`⚠ 点「${f}」之后激活页签变成 ${JSON.stringify(idNow.activeTab)}，不是「${flags['expect-tab']}」——这次读数作废`);
+    }
+    result.filters.push({ filter: f, clickedBy: how, identity: idNow, ...snap });
+    console.log(`[probe] ${f.padEnd(8)} rows=${String(snap.rows).padStart(3)} ${snap.pags.join(' ') || '(无分页)'}  tab=${idNow.activeTab.join(',') || '-'}`);
   }
 
   result.httpFailures = [...new Map(failures.map((x) => [x.status + x.url, x])).values()];
-  console.log('\n[probe] 默认状态:', JSON.stringify({ rows: result.default.rows, pags: result.default.pags, tabs: result.default.tabs }));
+  console.log('\n[probe] 默认状态:', JSON.stringify({ rows: result.default.rows, pags: result.default.pags, tab: result.default.activeTab, tabs: result.default.tabs }));
 
   const zeroButRows = [result.default, ...result.filters].filter((s) => s.rows > 0 && (s.pags || []).some((p) => /共\s*0\s*条/.test(p)));
   if (zeroButRows.length) {

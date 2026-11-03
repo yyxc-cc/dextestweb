@@ -7,6 +7,9 @@
 ├─ 00-问题清单-单文件.html   ← 主入口（资源内嵌，双击即看，可转发）
 ├─ 系统名-问题清单.pdf       ← 发人 / 打印（图片单列，无视频）
 ├─ 00-问题清单.md            ← 纯文字，方便贴群、贴飞书/钉钉文档
+├─ 01-重置只清条件不重查.mp4  ← 缺陷视频（自动切）
+├─ 01-重置只清条件不重查-封面.jpg
+├─ 01-重置只清条件不重查.gif  ← 会动的缩略图
 ├─ 完整演示录像.mp4          ← 一次完整走查
 ├─ 01-P0-xxx/
 │   ├─ 01-….png              ← 标注图，编号即阅读顺序
@@ -31,10 +34,13 @@
 结果就是客户说"图片打不开"。把资源 base64 内嵌后，HTML 变成自包含文件：
 
 ```bash
+node scripts/md2html.js 00-问题清单.md            # ← 报告是 md，先转 html（图片相对路径保持）
 node scripts/pack.js --html 00-问题清单.html --name "302MOM-问题清单" --gif-to-mp4
 # → 00-问题清单-单文件.html（图片/视频内嵌）
 # → 302MOM-问题清单.pdf（打印样式）
 ```
+
+> 跳过 md2html 直接打包的情况：报告本来就是 HTML（含 `<img src>`）。md 里用 `![说明](01-xxx.png)` 插图，转换后 pack.js 才能把它内嵌进去。
 
 注意体积：10 MB 左右的单文件 HTML 浏览器没问题，但有些预览面板会卡。**同时给 PDF 作为兜底**，并告诉客户"打不开 HTML 就看 PDF"。
 
@@ -68,11 +74,26 @@ node scripts/pack.js --html 00-问题清单.html --name "302MOM-问题清单" --
 
 - 录全程（一次走查），按缺陷切片，不重录
 - 录屏尺寸跟随视口比例（`lib/session.js` 自动换算），写死尺寸会加黑边、切片后画面被压扁
-- 切片：动作前 2 秒 → 结果出现后 3~5 秒
-- 先用 `clip.js sheet --times 0,2,4,6,8` 看联络表确认时间轴，再切
+- **推荐用 `lib/demo.js` 自动出片**：`demo.mark()` 打点 → `finishDemo()` 按标记切 mp4 + 封面 + gif
+- 自动出片默认在画面上方加**留白标题条**（标题=标记名，备注=副标题），画面本身零遮挡；`caption:false` 可关
+- 标题条颜色跟截图语义一致：红=缺陷、橙=待确认、绿=正常对照
+- 切片：动作前 2 秒 → 结果出现后 3~5 秒（自动模式默认 `pre=9, post=8`，够看清前后状态）
+- 手动切先用 `clip.js sheet --times 0,2,4,6,8` 看联络表确认时间轴，再切
 - 每段配一句"看什么"（看右下角分页 / 看提示语 / 看已投数量）
 - GIF 两遍调色板；`palettegen` 加 `-frames:v 1`；>3MB 就 crop + 降 fps/宽度
-- 文件名统一：`复现全过程.mp4`、`关键片段.gif`，客户不用猜
+- 文件名统一：`01-<结论>.mp4`、`01-<结论>-封面.jpg`、`01-<结论>.gif`，客户不用猜
+
+自动出片：
+
+```js
+const { createDemo, finishDemo } = require('./scripts/lib/demo');
+const demo = createDemo(page, s.videoStart);
+demo.mark('重置只清条件不重查');          // ← 动作之前
+// …点重置…
+await finishDemo({ page, ctx, demo, outDir, pre: 9, post: 8, gif: true });
+```
+
+手动切片：
 
 ```bash
 node scripts/clip.js cut  final.mp4 107 53 "01-P0/复现全过程.mp4"
@@ -80,6 +101,25 @@ node scripts/clip.js gif  final.mp4 112 20 "01-P0/关键片段.gif" --width 960 
 node scripts/clip.js frame final.mp4 131 "01-P0/03-提示语.png"
 node scripts/clip.js sheet final.mp4 --times 36,48,60,72 --cols 4 --out 联络表.png
 ```
+
+### 报告里怎么放视频
+
+md 里一行就够：
+
+```md
+![重置只清条件不重查](01-重置只清条件不重查.mp4)
+```
+
+- `md2html.js` → `<video controls autoplay loop muted playsinline>`（muted 是浏览器自动播放的前提）
+- 同目录同名 `-封面.jpg` 自动挂成 `poster`，没点播放时显示的是"结果那一帧"，不是黑块
+- `pack.js` 把 mp4 转 `data:video/mp4;base64` 内嵌，**单文件断网也能播**
+- PDF 打印样式里视频隐藏，所以**关键结论仍要有一张静图兜底**
+
+### 关于"录像时长被压缩"
+
+实测（20 秒静止页，两次）：墙钟 78.08s → 视频 78.84s；墙钟 60.09s → 视频 60.92s。
+**时间轴是线性的，静止不会丢时间。** 感觉"8 分钟录成 3 分钟"，真实原因是开录比页面创建晚几秒（首帧到达才计时），
+以及 ffprobe 缺失导致时长读不到、切点越界被截断。`demo.js` 已用 `结束墙钟 − 视频时长` 校准，并对越界切片告警。
 
 ## 交付前自检（写脚本，不靠眼睛）
 

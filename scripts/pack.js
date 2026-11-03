@@ -77,7 +77,7 @@ html = html.replace(/<video([^>]*?)src="([^"]+\.(?:mp4|webm))"([^>]*)>/gi, (m, p
   stats.inlined++;
   return `<video${pre}src="${dataUri(f)}"${post}>`;
 });
-html = html.replace(/(src|href)="([^"]+\.(?:png|jpe?g|webp|gif|svg))"/gi, (m, attr, rel) => {
+html = html.replace(/(src|href|poster)="([^"]+\.(?:png|jpe?g|webp|gif|svg))"/gi, (m, attr, rel) => {
   const f = resolveAsset(rel);
   if (!fs.existsSync(f)) { stats.missing++; return m; }
   stats.inlined++;

@@ -1,11 +1,11 @@
 ---
 name: dextestweb
-description: 黑盒测试一个你不拥有、没有源码和设计权的 Web 系统：从登录摸清模块、逐页取证、用双证据验证结论、生成带标注的截图与视频/GIF（标注放在四周留白里，不遮挡原图），最后打包成客户能直接看的报告。Use when asked to test a web app you don't own, find defects without source code, prove a bug with screenshots/video, or produce a client-ready test report.
+description: 黑盒测试一个你不拥有、没有源码和设计权的 Web 系统：从登录摸清模块、逐页取证、用双证据验证结论、发现缺陷当场自动剪出演示视频、生成带标注的截图与 GIF（标注放在四周留白里，不遮挡原图），最后打包成客户能直接看的报告。内含工业/MOM 业务知识与硬不变量，不懂车间也能判断业务对错。Use when asked to test a web app you don't own, find defects without source code, prove a bug with screenshots/video, review a manufacturing/MES/MOM system, or produce a client-ready test report.
 license: MIT
 compatibility: opencode, claude-code
 metadata:
   author: dextestweb
-  version: "1.1.1"
+  version: "1.3.0"
 ---
 
 # dextestweb · 不拥有系统的人，怎么把它测明白
@@ -23,6 +23,8 @@ metadata:
 
 本技能用一套固定流程把这些坑堵住：**先摸骨架，再逐页取证，每个结论至少两种证据，最后用标注图和视频把它钉死。**
 
+如果你的对象是工厂系统（MES / MOM / ERP / WMS），先花 20 分钟读 [`references/04-industry.md`](references/04-industry.md)：**ERP 管该不该做，MOM 管怎么做完，WMS 管料在哪，QMS 管能不能放行**；后面有 10 条硬不变量和一张术语表，看到不懂的字段直接查。开测时把 [`references/05-mom-checks.md`](references/05-mom-checks.md) 摊在旁边，一页一页照着对。不懂业务时，你只能测"按钮能不能点"；懂一点业务，你才能测"数对不对"。
+
 ---
 
 ## 边界：开始之前先写下来
@@ -38,10 +40,13 @@ metadata:
 
 | 事项 | 做法 |
 |---|---|
+| 业务预习 | 工厂系统先读 `references/04-industry.md`（概念）和 `05-mom-checks.md`（逐页检查点）。不知道"投入=合格+报废+在制"，就只能测按钮 |
 | 交付目录 | 先建好，用编号排序：`01-P0-xxx/`、`02-P1-xxx/`、`06-模块实况/` |
+| 登录态 | 首次登录后缓存到 `.auth/<host>.json`（`storageState`），后面所有脚本免登录。换账号、权限测试、或缓存失效时加 `--fresh` 重登。**别让每个脚本都重登一遍**——慢系统上这是最大的时间黑洞，也是撞后端抽风的主要来源 |
 | 浏览器 | Playwright + Chromium，viewport 1600×1000（截图清晰、表格列不挤） |
-| 录屏 | `context.recordVideo`，1280×800；注意成片时长会被压缩（8 分钟操作 ≈ 3 分钟视频） |
-| 视频处理 | 确认 `ffmpeg` 可用：切片、GIF、拼图 |
+| 录屏 | `context.recordVideo`，尺寸自动跟视口等比（`lib/session.js` 已处理）。**时间轴是线性的，静止不会压缩**；唯一偏差是"开录比页面创建晚几秒"，收尾时用 `结束墙钟 − 视频时长` 反推即可（`lib/demo.js` 已做，无需手工对时） |
+| 视频处理 | 确认 `ffmpeg` 可用（`ffmpeg -version`）；`ffprobe` 常常没有，`demo.js` 会退化成读 `ffmpeg -i` 的 Duration |
+| 缺陷视频 | 想要"一发现 bug 就有片"，用 `lib/demo.js`：全程录 → `demo.mark()` 打点 → `finishDemo()` 自动切片出 mp4 + 封面 + GIF（见第 5 步） |
 | 中文路径 | 一律用 Node `fs` 或编辑器写文件；**不要用 PowerShell 拼中文路径和中文输出**（会乱码/截断） |
 
 先把"登录 → 截图"跑通，再往下走。登录选择器写进 `config.json`，不要硬编码在十几个脚本里。
@@ -56,6 +61,7 @@ metadata:
 2. **抓接口**：`page.on('response')` 收集所有 `/api/` 响应，重点记 4xx/5xx 和分页接口的 `totalElements`。
 3. **遍历菜单**：取侧边栏文本 → 点击 → 等目标内容出现 → 记 URL。
 4. **每页四个数**：表格行数、分页文案（只统计**可见**的 `.el-pagination`）、标签页、工具按钮。
+5. **每页一个指纹**：`hash + 激活页签 + 菜单高亮 + 文本长度`。这四样都没变却换了菜单 → 点击没生效，这一页的数不能信。
 
 > 这四组数就是后面的"照妖镜"：页面 5 行却写"共 0 条"、接口 20 条却页面空白，都是在这一步暴露的。
 
@@ -83,6 +89,7 @@ await page.waitForFunction(() =>
 
 判断"这页是空的"之前，按顺序排除：
 
+0. **页面身份对不对？**（激活页签、URL、菜单高亮，见下）
 1. 有没有 loading 遮罩 / 骨架屏 / 小转圈？（有 → 还没加载完，继续等）
 2. 分页 total 是多少？（`共 0 条` + 表格有行 = 分页 bug，不是没数据）
 3. 换个筛选条件试试（未接收 → 检验中 → 已处理）
@@ -92,6 +99,24 @@ await page.waitForFunction(() =>
 **慢 ≠ 没做。** 慢要写成性能问题（附实测秒数），不要写成"功能缺失"。
 
 **任何"看起来没实现"的结论，必须再等 30 秒 + 刷新重进一次，才能写进报告。**
+
+### 读数之前，先确认"我现在在哪一页"
+
+点页签经常不生效（Element UI 的 `.el-tabs__item` 点了没切，或者同名按钮落在隐藏页签里）。**这是黑盒测试最贵的误判**：你会把射线页签的数据，当成 CT 页签的结论写进报告，而且看起来一切正常。
+
+```js
+const { expectPage, snapshot } = require('./lib/session');
+
+// 闸门：文字对不上就抛异常 + 截图，本次读数直接作废
+await expectPage(page, cfg, { tab: 'CT', hash: '/page/xxx', text: '试验项目' });
+const snap = await snapshot(page, cfg);      // 过了闸门才允许读数
+```
+
+规则：
+
+- 带页签的页面，`probe.js --expect-tab "CT"` 是**必填**，不是可选项。
+- 报告里的每个读数都要带 `activeTab`；出问题时第一眼能分清"系统错了"还是"我们读错页了"。
+- 点页签后自己校验 `.el-tabs__item.is-active` 的文字，不要假设"点了就切了"。同名按钮（工具栏里的"生成报告"）可能先在隐藏页签里被命中，用 `:visible` 还不够，要连页签一起限定。
 
 ---
 
@@ -105,7 +130,34 @@ await page.waitForFunction(() =>
 影响（对现场意味着什么）/ 修复方向（一句话）
 ```
 
-三条经验：
+### 先把页面"数清楚"：snap 清单
+
+凭眼睛看会漏。先让脚本把这一页的**页签 / 工具栏 / 字段 / 列 / 行数 / 分页 / 弹窗 / 分类树**全列出来，每个元素都带一个能直接给 `annotate.js` 用的选择器：
+
+```bash
+node scripts/snap.js --config config.json --url "<页面URL>" \
+  --tab "综合查询" --expect-tab "综合查询" \
+  --wait 6000 --verbose --json snap-adv.json
+```
+
+输出直接告诉你三件事：
+
+- **能点但会改数据的按钮**（新建/导入/修改/作废）——只读测试**不要点**；
+- **"重置/清空"类按钮**——这类按钮是"只清 UI 不重查"的高发区，看到就先怀疑；
+- **表单字段 vs 表格列**——新建弹窗少一个关键字段（比如没有"物料编号"），只有列清单才能一眼看出来。
+
+想证明"这次改完真的没影响别的地方"，把改动前后各存一份，跑结构比对：
+
+```bash
+node scripts/snap.js ... --json before.json
+# …（改配置 / 换版本 / 再点一遍）…
+node scripts/snap.js ... --diff before.json --fail-on-change
+# 退出码 4 = 结构变了；CI/回归里可以直接当门禁
+```
+
+> 读数的前提仍然是**身份闸门**：`--expect-tab` 对不上，`snap.js` 退出码 2 并截图，绝不继续读数。
+
+### 三条经验
 
 - **截图要有定位上下文**：地址栏、菜单高亮、目标行、分页文案，缺一个对方就能说"这不是那个页面"。
 - **数值类缺陷给变化序列**：`1→9→13→17…` 比一张静态截图强十倍，能证明"每次操作都累加"。
@@ -167,17 +219,56 @@ await shot(page, '01-计划4件已投33件.png', {
 
 ---
 
-## 第 5 步：视频与 GIF
+## 第 5 步：视频演示（发现 bug 就出片）
 
-- **录全程**（一次完整走查），再按缺陷切片段，不要为每个缺陷重录一遍。
-- 录屏尺寸自动跟随视口比例（`lib/session.js` 按 viewport 等比换算），**不要写死 1280×800**——比例不对 Playwright 会加黑边，切完片画面被压扁。
-- 切点：**动作前 2 秒**开始，**结果出现后再留 3~5 秒**。
-- 先用 `clip.js sheet` 出一张联络表（`--times 0,2,4,6,8`）确认时间轴，再决定切点；比反复试切快得多。
+**目标：发现缺陷的那一下，就已经有了能直接发群的短视频。** 不补录、不拖时间轴。
+
+原理只有三句：
+
+1. 整个走查从打开浏览器就开始录（`openSession(cfg, { videoDir })`）；
+2. 每发现一个缺陷，在**动作发生之前**打一个标记 `demo.mark('重置不重查')`；
+3. 收尾 `finishDemo()` 按标记前后各留几秒自动切片，出 `mp4 + 封面.jpg + gif`。
+
+为什么必须"先录后切"：缺陷是走查中撞见的，事先不知道哪一秒会发生；事后补录会丢掉"操作前"的状态，说服力少一半。
+
+```js
+const { loadConfig, openSession, gotoPage, expectPage } = require('./scripts/lib/session');
+const { createDemo, finishDemo } = require('./scripts/lib/demo');
+
+const s = await openSession(cfg, { videoDir: 'tmp/rec' });
+const demo = createDemo(s.page, s.videoStart);      // t0 = 页面创建时刻
+
+// …走到可疑的地方，先取"操作前"读数…
+demo.mark('重置只清条件不重查', '条件清空、列表仍是 1 条、0 个请求');
+await page.locator('button', { hasText: '重置' }).click();
+// …取"操作后"读数…
+
+const res = await finishDemo({
+  page: s.page, ctx: s.ctx, demo,
+  outDir: '交付目录',
+  pre: 9, post: 8,        // 前 9 秒（看得到操作前）、后 8 秒（看得到结果稳定）
+  gif: true
+});
+// → 01-重置只清条件不重查.mp4 / -封面.jpg / .gif
+```
+
+要点：
+
+- **标记打在动作前**，不是动作后。`pre` 那几秒就是"操作前状态"的证据。
+- 一次走查可以打多个标记，收尾一次性切完，编号自动递增（`01-`、`02-`…）。
+- **标题条**：默认会在画面上方加一条 70px 左右的留白标题条（标题=标记名，副标题=备注），画面一个像素都不遮挡——和截图"标注在留白里"是同一条原则。不想要就 `caption: false`。
+- 颜色语义跟截图一致：`demo.mark('…', '…', { color: '#e67e22' })` 橙色=待确认、`#16a085` 绿色=正常对照。
+- 切片自带自检：片段明显短于预期会告警（说明标记点超出了录像范围），不会悄悄交一个黑屏。
+- 封面取"结果已经稳定"的那一帧（片段结束前 2.5 秒），不是点击那一瞬；封面也带标题条，发出去单看一张图也能读懂。
+- 报告里就写一行：`![重置只清条件不重查](01-重置只清条件不重查.mp4)`。`md2html.js` 会转成带控件的 `<video>`，同名 `-封面.jpg` 自动挂成 poster，`pack.js` 把它 base64 内嵌进单文件 HTML。
+- 视频里最好有一句"看什么"：切片前后各留的几秒，就是让观众自己看到"变了 / 没变"。
+
+**手工切片**（已经有录像、只想补一段）仍用 `scripts/clip.js`：
+
+- 切点：动作前 2 秒开始，结果出现后再留 3~5 秒。
+- 先用 `clip.js sheet` 出联络表（`--times 0,2,4,6,8`）确认时间轴，比反复试切快得多。
 - GIF 用两遍调色板；`palettegen` 必须加 `-frames:v 1`，否则报 "Could not get frame filename number 2"。
 - GIF > 3 MB 就降规格：`crop` 掉无关区域 + `fps 7` + 宽 760，通常能从 9 MB 降到 500 KB。
-- 每段旁边写一句"看什么"（例：看右下角分页从 `共 0 条` 变成 `共 5 条`）。
-
-用 `scripts/clip.js`：切片、GIF、抽帧、九宫格联络表一次搞定。
 
 ---
 
@@ -190,6 +281,9 @@ await shot(page, '01-计划4件已投33件.png', {
 ├─ 00-问题清单-单文件.html   ← 主入口，图片/视频全内嵌
 ├─ 302MOM-问题清单.pdf       ← 发人/打印版
 ├─ 00-问题清单.md            ← 纯文字版，方便贴群/贴文档
+├─ 01-重置只清条件不重查.mp4  ← 缺陷视频（自动切）
+├─ 01-重置只清条件不重查-封面.jpg
+├─ 01-重置只清条件不重查.gif  ← 会动的缩略图，贴群/邮件预览
 ├─ 完整演示录像.mp4
 ├─ 01-P0-xxx/  01-….png 02-….png 复现全过程.mp4 关键片段.gif
 ├─ 02-P1-xxx/  …
@@ -198,15 +292,21 @@ await shot(page, '01-计划4件已投33件.png', {
 
 **必须做单文件版。** 带中文文件名的相对路径，在很多查看器（包括各类预览面板）里会解析失败，用户只会看到"图片打不开"。把资源 base64 内嵌，一个文件走天下。
 
-用 `scripts/pack.js` 一键生成单文件 HTML + PDF（PDF 用打印样式：单列图片、隐藏视频）。
+用 `scripts/pack.js` 一键生成单文件 HTML + PDF（PDF 用打印样式：单列图片、隐藏视频）。视频会以 base64 内嵌，**单文件 HTML 里能直接播**；同名 `-封面.jpg` 会被挂成 poster，没点播放时也不是黑块。
+
+报告是 md 写的，先过一道 `scripts/md2html.js` 再打包：`node scripts/md2html.js 报告.md` → `node scripts/pack.js --html 报告.html --name "客户-模块"`。md 里用 `![说明](01-xxx.png)` 插图、`![说明](02-xxx.mp4)` 插视频，pack.js 才会把它内嵌。
 
 ---
 
 ## 第 7 步：交付前自检
 
 - [ ] 所有 `<img>` 的 `naturalWidth > 0`（脚本测，不靠眼睛）
-- [ ] 所有 mp4 用 ffmpeg 读出时长，和描述一致
+- [ ] 所有 mp4 用 ffmpeg 读出时长，和描述一致；**每段视频都要能播**（不是 0 字节 / 黑屏）
+- [ ] 单文件 HTML 里的视频是 `data:video/mp4`，断网也能播
 - [ ] 每条结论都能指到具体截图编号 / 视频时间点
+- [ ] 每条读数都能指到 `activeTab`（证明读的是这一页，不是上一页）
+- [ ] 读数是否通过了身份闸门（`--expect-tab` / `expectPage()`，失败即作废）
+- [ ] 业务类结论是否落到三种口径之一：**确定错误（违反不变量）/ 待业务确认 / 观察项**
 - [ ] 写过的测试数据列成清单，附清理建议（单号 + id + 原值）
 - [ ] 推翻过的早期结论写进"更正表"，不要偷偷删
 - [ ] 客户说"不用测"的模块，标注"未覆盖 + 原因"
@@ -219,12 +319,18 @@ await shot(page, '01-计划4件已投33件.png', {
 | 你看到的 | 可能是 | 正确做法 |
 |---|---|---|
 | 点菜单后空白 | 还没加载完（4~18 秒） | 记录耗时 → 性能问题；等目标元素出现再判断 |
+| 点了页签，数据"不对" | 页签根本没切换，读的是上一页 | 校验 `.el-tabs__item.is-active` 文字；`probe.js --expect-tab` |
+| 连续两个菜单内容一模一样 | 点击没生效 | 比对页面指纹（hash + 激活页签 + 文本长度） |
+| 直达页面地址后空白，hash 却是对的 | 应用还没初始化完，路由把这次跳转丢了 | `gotoPage()` 会等就绪再跳，失败自动 reload / 重新整页进一次 |
 | 列表"共 0 条" | 分页 total 没接 | 数表格行数 + 看接口 totalElements |
 | 某筛选下没数据 | 默认筛选就是空的 | 逐个筛选试一遍再下结论 |
 | 页面没有按钮 | 按钮在行内"操作"列 | 遍历表格行内按钮，别只看顶部工具栏 |
 | 搜索结果 0 条 | 参数被拆/拼错 | 看地址栏和请求参数，别急着说"没索引" |
 | 保存报错但页面没变 | 前端已改、后端回滚失败 | 刷新 + 查列表/接口，确认数据到底变没变 |
 | 接口 200 但页面空 | 前端渲染/字段映射 | 对照接口返回与页面字段 |
+| 两个入口的"总数"不一样 | 统计口径/过滤范围不同 | 先证明包含关系（A⊆B），再问差的那些去哪了；写"待业务确认" |
+| 数量加起来对不上 | 漏了在制/报废/退料 | 按"投入 = 合格 + 报废 + 在制"列等式，缺项写清 |
+| 换单位后数量怪 | 换算率或精度问题 | 记下换算前后两组数，`1 吨 = 1000 千克` 是最低标准 |
 
 ---
 
@@ -233,14 +339,23 @@ await shot(page, '01-计划4件已投33件.png', {
 | 路径 | 用途 |
 |---|---|
 | `scripts/lib/annotate.js` | 标注截图：干净截图 + 四周留白排版（编号/引线/图例/说明/地址栏/证据面板），原图零覆盖 |
-| `scripts/census.js` | 登录 + 遍历菜单，产出 `census.json`（模块、URL、行数、分页、按钮） |
-| `scripts/probe.js` | 单页取证：等目标出现、数行数、读可见分页、抓 4xx/5xx |
+| `scripts/lib/demo.js` | 缺陷视频：全程录像打标记 → 自动切片 mp4 + 封面 + GIF（含时间轴校准、短片告警） |
+| `scripts/lib/session.js` | 会话：登录态缓存（`.auth/`）、页面身份校验 `expectPage()`、可见性过滤后的页面读数、`videoStart` |
+| `scripts/lib/snap.js` | 结构化元素清单核心：页签/工具栏分级/字段/列/分页/弹窗/树 + 结构 diff |
+| `scripts/census.js` | 登录 + 遍历菜单，产出 `census.json`（模块、URL、行数、分页、按钮、页面指纹） |
+| `scripts/probe.js` | 单页取证：页面身份闸门、等目标出现、数行数、读可见分页、抓 4xx/5xx |
+| `scripts/snap.js` | 单页元素清单 CLI：`--tab` 切页签并校验、`--diff` 结构比对、`--fail-on-change` 退出码 4 |
 | `scripts/clip.js` | ffmpeg：切片 / GIF / 抽帧 / 联络表 |
-| `scripts/pack.js` | 报告打包：资源内嵌单文件 HTML + PDF |
+| `scripts/pack.js` | 报告打包：资源内嵌单文件 HTML + PDF（支持视频与 poster） |
+| `scripts/md2html.js` | 报告 md → html（pack.js 的前置步骤；`![x](y.mp4)` 转 `<video>`） |
+| `scripts/selftest.js` | 不依赖被测系统的端到端自检（标注 → 视频切片 → 内嵌 → PDF） |
 | `references/01-recon.md` | 摸骨架的细节与选择器 |
 | `references/02-evidence.md` | 双证据、三查法、复现步骤写法 |
 | `references/03-packaging.md` | 交付格式与中文路径坑 |
+| `references/04-industry.md` | **工业业务课**：系统版图、订单主线、12 个核心对象、10 条硬不变量、九类行业缺陷、术语表 |
+| `references/05-mom-checks.md` | **MOM 只读快检表**：物料/BOM/工艺/工单/报工/库存/质检/追溯/KPI 逐项检查点 |
 | `templates/config.example.json` | 登录/菜单/等待条件配置 |
+| `templates/demo-script.js` | 缺陷视频脚本模板（标记 → 自动切片 → 出封面/GIF） |
 | `templates/issue.md` | 单个问题的记录模板 |
 | `templates/report.html` | 报告页面模板（深色卡片 + 截图 + 视频） |
 
@@ -249,7 +364,10 @@ await shot(page, '01-计划4件已投33件.png', {
 ## 最短可用路径（赶时间就照这个跑）
 
 1. `cp templates/config.example.json config.json`，改账号和登录选择器
-2. `node scripts/census.js --config config.json` → 看 `census.json`，找出"页面行数 vs 分页总数"不一致的页面
-3. 对可疑页 `node scripts/probe.js --config config.json --url "<页面URL>"`，逐个筛选/标签页验证
-4. 确认的缺陷：`annotate.js` 出图 → `clip.js` 切视频 → `pack.js` 打包
+2. `node scripts/census.js --config config.json` → 看 `census.json`，先排除 `suspectStale: true` 的页，再找"页面行数 vs 分页总数"不一致的页面
+3. 对可疑页 `node scripts/snap.js --config config.json --url "<URL>" --tab "<页签>" --expect-tab "<页签>" --verbose`，拿到完整元素清单；再 `node scripts/probe.js` 逐个筛选/标签页验证
+4. 确认的缺陷：`annotate.js` 出图 → 走查时 `demo.mark()` 打点、收尾 `finishDemo()` 出片 → `pack.js` 打包
 5. 按"交付前自检"过一遍，再发出去
+6. 工厂系统：先读 `references/04-industry.md` 的不变量表，把"数值对不上"写成"违反数量守恒/口径一致"，比"看着不对"有力得多
+
+> 自检也要跑：`node scripts/selftest.js` 一次验证「标注 → 切片 → 内嵌 → PDF」全链路，不依赖被测系统。

@@ -17,5 +17,8 @@
   "readySelector": ".app-main .el-table__body tbody tr",
   "navTimeout": 90000,
   "waitAfterNav": 2500,
-  "locale": "zh-CN"
+  "locale": "zh-CN",
+  "authDir": ".auth",
+  "reuseAuth": true,
+  "probeTimeout": 60000
 }
