@@ -21,7 +21,8 @@
     "LICENSE",
     "references",
     "scripts",
-    "templates"
+    "templates",
+    "docs"
   ],
   "keywords": ["agent-skill", "testing", "playwright", "black-box", "evidence", "report"]
 }

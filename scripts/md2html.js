@@ -8,6 +8,10 @@
  * 为什么需要：实测报告一直是 md 写的，但 pack.js 吃的是 html；没有这一步就得手工转、
  * 转完图片路径还容易错。这里只覆盖报告真正用到的语法（标题/表格/代码块/引用/列表/图片），
  * 不引第三方依赖，输出可直接进 pack.js。
+ *
+ * 另支持 RAW 块：用 <!--RAW--> … <!--/RAW--> 包住的整段 HTML 原样输出，
+ * 用于报告首屏（整体线路 / 数据流转 / 同行对照）这类需要自定义结构的区块；
+ * 里面的 <img>/<video> 相对路径仍会被 pack.js 正常内嵌。
  */
 const fs = require('fs');
 const path = require('path');
@@ -59,6 +63,17 @@ function convert(md) {
     }
 
     if (!ln.trim()) { closeList(); i++; continue; }
+
+    // RAW 块：<!--RAW--> … <!--/RAW--> 原样输出（首屏线路/流转/对照等自定义 HTML）
+    if (ln.trim() === '<!--RAW-->') {
+      closeList();
+      const buf = [];
+      i++;
+      while (i < lines.length && lines[i].trim() !== '<!--/RAW-->') { buf.push(lines[i]); i++; }
+      i++;
+      out.push(buf.join('\n'));
+      continue;
+    }
 
     if (/^---+$/.test(ln.trim())) { closeList(); out.push('<hr>'); i++; continue; }
 

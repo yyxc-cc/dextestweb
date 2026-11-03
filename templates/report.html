@@ -5,6 +5,8 @@
 <title>{{系统名}} 功能测试 · 问题清单</title>
 <!--
   用法：
+  0. 首屏 #route 区块必须保留并按实际改写：整体线路（编号节点）/ 数据流转与状态门槛 / 同行对照。
+     三块要能脱离正文独立读懂；节点编号 = 步骤表编号 = 证据文件名前缀（01-、02-…）。
   1. 复制本文件为 交付包/00-问题清单.html
   2. 每个缺陷复制一个 <section class="card">，编号、图片路径、视频路径换成自己的
   3. 图片放 01-P0-xxx/ 子目录，路径用相对路径（打包时会被 pack.js 内嵌）
@@ -63,6 +65,39 @@
   table.mod{width:100%;border-collapse:collapse;font-size:14px}
   table.mod th,table.mod td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left}
   table.mod th{color:var(--dim);font-weight:600;font-size:13px}
+
+  /* ===== 首屏：整体线路 / 数据流转 / 同行对照 ===== */
+  .firstscreen{margin-bottom:18px}
+  .route{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:14px 0 4px}
+  .node{flex:1 1 0;min-width:0;background:#111826;border:1px solid var(--line);border-radius:10px;
+    padding:8px 9px;text-decoration:none;color:var(--tx);display:block}
+  .node:hover{border-color:#3b82f6}
+  .node .no{display:inline-block;min-width:17px;height:17px;line-height:17px;text-align:center;border-radius:5px;
+    background:#3b82f6;color:#fff;font-size:11px;font-weight:700;margin-right:5px}
+  .node b{font-size:13px;white-space:nowrap}
+  .node i{display:block;color:var(--dim);font-size:11.5px;font-style:normal;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .arrow{color:#3b82f6;font-size:12px;padding:0;flex:0 0 auto}
+  .arrow::before{content:"→"}
+  .fs-grid{display:grid;grid-template-columns:1fr 1.12fr;gap:18px;margin:10px 0 16px}
+  @media(max-width:900px){.fs-grid{grid-template-columns:1fr}}
+  .flow{display:flex;flex-wrap:nowrap;align-items:center;gap:2px;margin:10px 0 10px;overflow:hidden}
+  .st{background:#0b111c;border:1px solid #2a3d59;border-radius:8px;padding:5px 8px;font-size:12.5px;white-space:nowrap}
+  .st.on{border-color:var(--green);color:#9be6cd}
+  .st.off{border-color:#4b5563;color:var(--dim)}
+  .gate{font-size:11.5px;color:#ffc46b;white-space:nowrap;padding:0 2px}
+  .gate::before{content:"—"}
+  .gate::after{content:"→"}
+  .steps{list-style:none;padding:0;margin:8px 0 0}
+  .steps li{border-bottom:1px dashed #24304a;padding:7px 0}
+  .steps li:last-child{border-bottom:none}
+  .steps summary{cursor:pointer;font-size:14px;color:#dbe5f4}
+  .steps summary b{color:#8fd3ff;margin-right:8px}
+  .steps .facts{margin:8px 0 2px}
+  .peer td.diff{color:#ff8b7e}
+  .src{display:inline-block;font-size:11.5px;padding:1px 6px;border-radius:4px;border:1px solid var(--line);
+    color:var(--dim);margin-left:4px;white-space:nowrap}
+  .src.ok{color:#9be6cd;border-color:#2f6f5e}
+  .src.wait{color:#ffc46b;border-color:#6b5320}
 </style>
 </head>
 <body>
@@ -73,6 +108,190 @@
     被测系统 <b>{{地址}}</b>　账号 <b>{{账号}}</b>　测试日期 <b>{{日期}}</b><br>
     测试方式：浏览器实际操作 + 接口返回核对 + 录屏。每条结论都有截图或录像对应。
   </div>
+
+  <!-- ==================================================================
+       首屏（不可删）：① 整体线路  ② 数据流转与状态门槛  ③ 同行对照
+       编号规则：节点编号 = 下方步骤表 = 正文步骤 = 证据文件前缀
+       示例为占位数据（PL-001 / P-001 / BOM V1.0 / WO-001），按实际替换
+  =================================================================== -->
+  <section id="route" class="card firstscreen">
+    <div class="h"><span class="lvl" style="background:#3b82f6">整体线路</span>
+      <h2>{{模块}}：从零到能被下游引用，共 {{N}} 步</h2></div>
+    <p class="lead small">
+      先看这条线，不必读正文：每步做完是什么状态、数据落到哪个对象、下一步凭什么能走。
+      编号 1…N 与下方步骤表、正文、证据文件一一对应；点节点跳步骤，点「Step N」看细节。
+    </p>
+
+    <!-- ① 整体线路：编号节点 + 连线 -->
+    <div class="route">
+      <a class="node" href="#s1"><span class="no">1</span><b>建产品线</b><i>PL-001 · 草稿</i></a>
+      <span class="arrow"></span>
+      <a class="node" href="#s2"><span class="no">2</span><b>建产品</b><i>P-001 · 草稿</i></a>
+      <span class="arrow"></span>
+      <a class="node" href="#s3"><span class="no">3</span><b>提交审核</b><i>草稿 → 待审</i></a>
+      <span class="arrow"></span>
+      <a class="node" href="#s4"><span class="no">4</span><b>审核 + 发布</b><i>已发布</i></a>
+      <span class="arrow"></span>
+      <a class="node" href="#s5"><span class="no">5</span><b>列表可见</b><i>可被引用</i></a>
+      <span class="arrow"></span>
+      <a class="node" href="#s6"><span class="no">6</span><b>建 BOM</b><i>V1.0 · 草稿</i></a>
+      <span class="arrow"></span>
+      <a class="node" href="#s7"><span class="no">7</span><b>BOM 审核</b><i>待审</i></a>
+      <span class="arrow"></span>
+      <a class="node" href="#s8"><span class="no">8</span><b>BOM 生效</b><i>已生效</i></a>
+      <span class="arrow"></span>
+      <a class="node" href="#s9"><span class="no">9</span><b>工单引用</b><i>WO-001</i></a>
+    </div>
+
+    <div class="fs-grid">
+      <!-- ② 数据流转与状态门槛 -->
+      <div>
+        <h3>② 数据流转：卡在哪个状态就不算"有数据"</h3>
+        <div class="flow">
+          <div class="st">草稿</div><span class="gate">保存</span>
+          <div class="st">待审</div><span class="gate">审核通过</span>
+          <div class="st">已发布</div><span class="gate">查询/引用</span>
+          <div class="st on">可见（列表·下拉·下游）</div>
+        </div>
+        <table class="mod">
+          <colgroup>
+            <col style="width:26%"><col style="width:24%"><col style="width:19%"><col style="width:31%">
+          </colgroup>
+          <tr><th>对象</th><th>关键字段</th><th>写入时机</th><th>可见条件</th></tr>
+          <tr><td>产品线 <code>PL-001</code></td><td>编码/名称/状态</td><td>Step 1 保存</td><td>启用后才可选</td></tr>
+          <tr><td>产品 <code>P-001</code></td><td>编码/单位/状态/发布时间</td><td>Step 2 保存</td><td><b style="color:#ffc46b">发布</b>后才进列表、BOM 可选</td></tr>
+          <tr><td>BOM <code>V1.0</code></td><td>父件/子件/用量/生效日期</td><td>Step 6 保存</td><td><b style="color:#ffc46b">生效</b>后才被工单取到</td></tr>
+          <tr><td>工单 <code>WO-001</code></td><td>产品/数量/BOM 版本</td><td>Step 9 下达</td><td>下达后才可派工报工</td></tr>
+        </table>
+        <p class="small">口径提醒：<b>保存成功 ≠ 已发布 ≠ 已生效 ≠ 可见</b>——四个状态混写就是错结论。</p>
+      </div>
+
+      <!-- ③ 同行对照：来源 + 差异 + 本地是否支持 -->
+      <div>
+        <h3>③ 同行/官方资料对照</h3>
+        <table class="mod peer">
+          <colgroup>
+            <col style="width:16%"><col style="width:20%"><col style="width:32%"><col style="width:14%"><col style="width:18%">
+          </colgroup>
+          <tr><th>环节</th><th>本地</th><th>同行做法 / 来源</th><th>差异</th><th>本地支持</th></tr>
+          <tr><td>产品创建</td><td>建完可查（{{占位}}）</td>
+            <td>SAP：建完为未发布态<span class="src">官方文档</span></td>
+            <td class="diff">差异</td><td>待验证</td></tr>
+          <tr><td>发布/启用</td><td>未见发布按钮</td>
+            <td>金蝶：启用后才可选<span class="src">帮助中心</span></td>
+            <td class="diff">差异</td><td>待验证</td></tr>
+          <tr><td>BOM 版本</td><td>显示 V1.0</td>
+            <td>用友：版本+生效日期<span class="src">实施案例</span></td>
+            <td>部分相同</td><td>支持版本</td></tr>
+          <tr><td>建 BOM 顺序</td><td>先产品后 BOM</td>
+            <td>B 站教程：产品线→产品→BOM<span class="src">视频教程</span></td>
+            <td>一致</td><td>支持</td></tr>
+        </table>
+        <div class="warn" style="margin:10px 0 0">
+          <b>待向客户/顾问确认：</b>①发布由谁执行、是否审核即自动发布；②未发布数据在下游是"不可选"还是"可选但提示"；
+          ③已发布要改动走变更单（ECN）还是可直接编辑。检索不到的已标「未找到可靠资料」，不编造。
+        </div>
+      </div>
+    </div>
+
+    <!-- ① 编号步骤（点开看细节；编号与上方节点、正文一致） -->
+    <h3>① 编号步骤（点开看：操作 / 数据流向 / 前置条件 / 产出 / 不做会怎样）</h3>
+    <ol class="steps">
+      <li id="s1"><details>
+        <summary><b>Step 1</b> 建产品线 <code>PL-001</code> → 草稿</summary>
+        <div class="facts"><table>
+          <tr><td>输入</td><td>编码 <code>PL-001</code>、名称（占位）</td></tr>
+          <tr><td>操作</td><td>产品线模块 → 新建 → 保存</td></tr>
+          <tr><td>数据流向</td><td>工艺员 → <code>产品线</code> 对象 → <b>草稿</b></td></tr>
+          <tr><td>前置 / 产出</td><td>无 / 产品线记录（未启用不可选）</td></tr>
+          <tr><td>不做会怎样</td><td>Step 2 的"产品线"下拉为空</td></tr>
+        </table></div>
+      </details></li>
+
+      <li id="s2"><details>
+        <summary><b>Step 2</b> 建产品 <code>P-001</code> → 草稿</summary>
+        <div class="facts"><table>
+          <tr><td>输入</td><td>编码 <code>P-001</code>、名称、单位、分类、产品线</td></tr>
+          <tr><td>操作</td><td>产品管理 → 新建 → 保存</td></tr>
+          <tr><td>数据流向</td><td>工艺员 → <code>产品</code> 对象 → <b>草稿</b>（保守假设，待核对）</td></tr>
+          <tr><td>前置 / 产出</td><td>Step 1 完成 / 产品草稿</td></tr>
+          <tr><td>不做会怎样</td><td>产品不出现在任何选择器里</td></tr>
+        </table></div>
+      </details></li>
+
+      <li id="s3"><details>
+        <summary><b>Step 3</b> 提交审核 → 待审</summary>
+        <div class="facts"><table>
+          <tr><td>操作</td><td>详情页 → 提交审核（或送审）</td></tr>
+          <tr><td>数据流向</td><td>工艺员 → 状态 <b>草稿 → 待审</b></td></tr>
+          <tr><td>前置 / 产出</td><td>必填齐全 / 待审记录 + 审核任务</td></tr>
+          <tr><td>不做会怎样</td><td>无审批人可审，流程停住</td></tr>
+        </table></div>
+      </details></li>
+
+      <li id="s4"><details>
+        <summary><b>Step 4</b> 审核通过 + 发布 <b style="color:#ffc46b">（门槛步）</b></summary>
+        <div class="facts"><table>
+          <tr><td>操作</td><td>技术主管审核通过 → 发布/启用</td></tr>
+          <tr><td>数据流向</td><td>审核人 → <b>待审 → 已发布</b>；发布时间落库</td></tr>
+          <tr><td>前置 / 产出</td><td>审核角色账号 / 已发布产品</td></tr>
+          <tr><td>不做会怎样</td><td>列表查不到、BOM 选不到（<b>最容易被漏的一步</b>）</td></tr>
+        </table></div>
+      </details></li>
+
+      <li id="s5"><details>
+        <summary><b>Step 5</b> 列表/前台可见（可被引用）</summary>
+        <div class="facts"><table>
+          <tr><td>操作</td><td>打开列表 / 前端门户，核对接口返回</td></tr>
+          <tr><td>数据流向</td><td>已发布 → 列表查询接口读到 → 对外可见</td></tr>
+          <tr><td>前置 / 产出</td><td>Step 4 完成 / 可见性证据（截图 + 接口）</td></tr>
+          <tr><td>不做会怎样</td><td>把"未发布"误判成"创建失败"</td></tr>
+        </table></div>
+      </details></li>
+
+      <li id="s6"><details>
+        <summary><b>Step 6</b> 建 BOM <code>V1.0</code> → 草稿</summary>
+        <div class="facts"><table>
+          <tr><td>输入</td><td>父件 <code>P-001</code>、子件物料、用量、版本 V1.0</td></tr>
+          <tr><td>操作</td><td>BOM 模块 → 新建 → 加行 → 保存</td></tr>
+          <tr><td>数据流向</td><td>工艺员 → <code>BOM</code> 对象 → <b>草稿</b>（引用物料主数据）</td></tr>
+          <tr><td>前置 / 产出</td><td>Step 5 完成、子件已发布 / BOM 草稿</td></tr>
+          <tr><td>不做会怎样</td><td>BOM 列表不出现；工单选不到 BOM</td></tr>
+        </table></div>
+      </details></li>
+
+      <li id="s7"><details>
+        <summary><b>Step 7</b> BOM 审核 → 待审</summary>
+        <div class="facts"><table>
+          <tr><td>操作</td><td>提交审核</td></tr>
+          <tr><td>数据流向</td><td>工艺员 → <b>草稿 → 待审</b></td></tr>
+          <tr><td>前置 / 产出</td><td>用量 &gt; 0 / 待审 BOM</td></tr>
+          <tr><td>不做会怎样</td><td>无法生效，工单仍用旧版</td></tr>
+        </table></div>
+      </details></li>
+
+      <li id="s8"><details>
+        <summary><b>Step 8</b> BOM 生效 <b style="color:#ffc46b">（门槛步）</b></summary>
+        <div class="facts"><table>
+          <tr><td>操作</td><td>审核通过 → 设生效日期</td></tr>
+          <tr><td>数据流向</td><td>审核人 → <b>待审 → 已生效</b>；写生效日期</td></tr>
+          <tr><td>前置 / 产出</td><td>版本唯一、无冲突生效版本 / 生效 BOM V1.0</td></tr>
+          <tr><td>不做会怎样</td><td>工单取到空 BOM 或旧 BOM</td></tr>
+        </table></div>
+      </details></li>
+
+      <li id="s9"><details>
+        <summary><b>Step 9</b> 工单 <code>WO-001</code> 引用 BOM</summary>
+        <div class="facts"><table>
+          <tr><td>输入</td><td>产品 <code>P-001</code>、数量（占位）</td></tr>
+          <tr><td>操作</td><td>工单模块 → 新建 → 选产品 → 系统带出 BOM/工艺</td></tr>
+          <tr><td>数据流向</td><td>计划员 → <code>工单</code> 对象 → 引用 BOM V1.0 + 工艺路线</td></tr>
+          <tr><td>前置 / 产出</td><td>Step 8 完成 / 工单草稿（含 BOM 快照）</td></tr>
+          <tr><td>不做会怎样</td><td>工单建不出，或 BOM 明细为空</td></tr>
+        </table></div>
+      </details></li>
+    </ol>
+  </section>
 
   <div class="selfnote">
     📦 <b>单文件版</b>：截图和视频已内嵌，可直接双击打开、也可单独转发；点任意截图可放大。
